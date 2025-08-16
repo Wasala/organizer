@@ -1,0 +1,8 @@
+{
+  "cache_dir": "~/.file_analysis_cache",
+  "max_return_chars": 5000,
+  "regex_default_flags": "im",
+  "token_limit": 4000,
+  "encoding_name": "cl100k_base",
+  "conversion_timeout": 45
+}
