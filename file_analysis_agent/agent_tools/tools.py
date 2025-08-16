@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ..agent import analyzer
+from .analyzer import analyzer
 
 
 def set(path: str, force: bool = False) -> dict:
