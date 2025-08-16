@@ -1,0 +1,17 @@
+[project]
+name = "file-analysis-agent"
+version = "0.1.0"
+description = "Tools for converting documents to Markdown and inspecting them"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+    "tiktoken",
+    "diskcache",
+]
+
+[project.optional-dependencies]
+docling = ["docling"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
