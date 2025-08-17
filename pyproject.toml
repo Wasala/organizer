@@ -8,6 +8,10 @@ dependencies = [
     "pydantic-ai",
     "tiktoken",
     "diskcache",
+    "sqlite-vec",
+    "fastembed",
+    "numpy",
+    "pysqlite3-binary",
 ]
 
 [project.optional-dependencies]
