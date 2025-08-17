@@ -1,6 +1,5 @@
 # FastAPI layer for FolderMate
 # pip install fastapi uvicorn pydantic sqlite-vec fastembed numpy
-# (and your file_organizer_db.py from before)
 
 from __future__ import annotations
 from typing import List, Optional, Literal, Dict, Any
@@ -14,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, validator
 
-from file_organizer_db import FileOrganizerDB
+from agent_utils.agent_vector_db import AgentVectorDB
 
 # ---------- App + CORS ----------
 BASE_DIR = os.path.dirname(__file__)
@@ -37,7 +36,7 @@ INDEX_PATH = os.path.join(STATIC_DIR, "index.html")
 def ui_root():
     return FileResponse(INDEX_PATH)
 
-db = FileOrganizerDB("organizer.config.json")
+db = AgentVectorDB("organizer.config.json")
 
 # ---------- Single-action state ----------
 class RunState:
