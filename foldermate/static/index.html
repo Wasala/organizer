@@ -1,12 +1,456 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FolderMate UI Placeholder</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FolderMate · UI</title>
+  <style>
+    :root{
+      --bg: #f7f7fb;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-weak:#dbeafe;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --danger:#dc2626;
+      --border:#e5e7eb;
+      --shadow: 0 10px 25px rgba(0,0,0,.07);
+      --radius: 14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial; background:var(--bg); color:var(--text)}
+    header{position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border)}
+    .wrap{max-width:1200px; margin:0 auto; padding:14px 20px}
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#7c3aed); box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}
+    .title{font-weight:700; letter-spacing:.2px}
+    .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px}
+    .chip{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--muted); font-size:12px}
+    main{max-width:1200px; margin:22px auto; padding:0 20px;}
+
+    /* Collapsible settings */
+    details.settings{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+    details.settings > summary{list-style:none; cursor:pointer; padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border)}
+    details.settings > summary::marker{display:none}
+    details.settings .content{padding:16px}
+    .chev{transition: transform .2s ease}
+    details[open] .chev{transform: rotate(90deg)}
+
+    .row{display:grid; grid-template-columns: 240px 1fr auto; gap:10px; align-items:center; margin:8px 0}
+    label{font-size:13px; color:var(--muted)}
+    input[type="text"], input[type="search"], textarea, select{width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; font: inherit}
+    input[type="checkbox"]{width:18px;height:18px}
+    button{border:none; background:var(--primary); color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; box-shadow: 0 6px 18px rgba(37,99,235,.22)}
+    button.ghost{background:#fff; color:var(--text); border:1px solid var(--border); box-shadow:none}
+    button.danger{background:var(--danger)}
+    .btn-row{display:flex; gap:8px; flex-wrap:wrap}
+
+    /* One-action-at-a-time visual states */
+    .main{transition: opacity .2s ease, background .2s ease}
+    .main.active{background:var(--ok); box-shadow: 0 6px 18px rgba(22,163,74,.25)}
+    .main.disabled{background:#e5e7eb !important; color:#9ca3af !important; box-shadow:none !important; cursor:not-allowed}
+
+    /* Table */
+    .table-wrap{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; margin-top:18px}
+    .table-tools{display:flex; gap:10px; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border)}
+    table{width:100%; border-collapse:separate; border-spacing:0; table-layout: auto}
+    thead{background:#fafafa; position:sticky; top:0; z-index:1}
+    th, td{padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; font-size:14px}
+    th{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em}
+    tbody tr:hover{background:#fcfcff}
+    .truncate{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px}
+
+    .scroll-area{overflow:auto; height:62vh}
+    .link-btn{background:none; border:none; color:var(--primary); padding:0; font:inherit; cursor:pointer; text-decoration:underline; flex:0 0 auto}
+
+    .cell-flex{display:flex; gap:8px; align-items:center}
+    .cell-flex .preview{flex:1 1 auto; min-width:0}
+    .cell-flex .preview.truncate{max-width:100%}
+
+    /* planned destination input width & style */
+    .plan-input{min-width:560px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+    @media (max-width: 980px){ .plan-input{min-width:300px} }
+    .plan-input.readonly{background:#f9fafb}
+    .plan-input.editable{box-shadow: 0 0 0 3px var(--primary-weak)}
+
+    .toast{position:fixed; right:16px; bottom:16px; background:#111827; color:#fff; padding:10px 14px; border-radius:10px; box-shadow:var(--shadow); opacity:0; transform: translateY(10px); transition: all .25s}
+    .toast.show{opacity:1; transform: translateY(0)}
+
+    /* Modal (ensure above sticky header/table) */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(17,24,39,.45); z-index:9999}
+    .modal.show{display:flex}
+    .dialog{background:#fff; width:min(900px, 92vw); max-height:80vh; border-radius:14px; box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column; z-index:10000}
+    .dialog header{padding:12px 16px; border-bottom:1px solid var(--border); position:static}
+    .dialog .body{padding:16px; overflow:auto; white-space:pre-wrap; line-height:1.45; max-height:calc(80vh - 110px)}
+    .dialog footer{padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end}
+  </style>
 </head>
 <body>
-  <h1>FolderMate</h1>
-  <p>This is a placeholder UI. Replace with actual mockup later.</p>
+  <header>
+    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div class="title">FolderMate</div>
+          <div style="font-size:12px; color:var(--muted)">AI Agent for file organization</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <span class="chip">Status: <strong id="statusChip">Pending user input</strong></span>
+        <span class="chip">Base: <span id="basePathChip" class="mono">(not set)</span></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Collapsible Settings (only pane) -->
+    <details class="settings" open>
+      <summary><span class="chev">▶</span><strong>Settings</strong></summary>
+      <div class="content">
+        <div class="row">
+          <label for="folderPicker">Source path (folder to organize)</label>
+          <input id="folderPath" type="text" placeholder="e.g. C:/cat" />
+          <div>
+            <label class="mono" style="display:none" for="folderPicker">Folder picker</label>
+            <input id="folderPicker" type="file" webkitdirectory directory multiple style="display:none" />
+            <input id="folderPickerPlan" type="file" webkitdirectory directory multiple style="display:none" />
+            <button class="ghost" id="browseBtn">Browse…</button>
+          </div>
+        </div>
+        <div class="row">
+          <label>Recurse subfolders</label>
+          <input id="chkRecursive" type="checkbox" checked />
+          <div></div>
+        </div>
+        <div class="row">
+          <label>Don't delete source file</label>
+          <input id="chkDontDelete" type="checkbox" checked />
+          <div></div>
+        </div>
+
+        <div class="btn-row" style="margin-top:12px">
+          <button id="btnScan" class="main" data-action="scan">Start/Refresh source files</button>
+          <button id="btnAnalyze" class="main ghost" data-action="analyze">Start/Resume file analysis</button>
+          <button id="btnPlan" class="main ghost" data-action="plan">Start/Resume organization plan</button>
+          <button id="btnDecide" class="main ghost" data-action="decide">Start/Resume final decisions</button>
+          <button id="btnMove" class="main ghost" data-action="move">Start/Resume moving</button>
+          <span style="flex:1"></span>
+          <button id="btnStop" class="danger">STOP ALL</button>
+        </div>
+      </div>
+    </details>
+
+    <!-- Detailed Plan -->
+    <section class="table-wrap" aria-labelledby="planTitle">
+      <div class="table-tools">
+        <strong id="planTitle">Detailed Plan</strong>
+        <div style="display:flex; gap:10px; align-items:center">
+          <input id="searchInput" type="search" placeholder="Search path/report/notes…" />
+        </div>
+      </div>
+      <div class="scroll-area" id="tableScroll">
+        <table aria-describedby="planTitle">
+          <thead>
+            <tr>
+              <th>Source file path</th>
+              <th>File report</th>
+              <th>Organization notes</th>
+              <th>Planned destination (editable)</th>
+              <th>Organized path</th>
+              <th>Created</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalBody">
+    <div class="dialog">
+      <header><strong id="modalTitle">Details</strong></header>
+      <div class="body" id="modalBody"></div>
+      <footer><button id="closeModal" class="ghost">Close</button></footer>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // --- State ---
+    const state = {
+      basePath: '',
+      recursive: true,
+      dontDelete: true,
+      status: 'Pending user input',
+      currentAction: null,
+      rows: [],
+      _planTargetId: null,
+      _clickTimers: {},
+    };
+
+    // --- Helpers ---
+    const $ = sel => document.querySelector(sel);
+    function setStatus(text){ state.status = text; $('#statusChip').textContent = text; }
+    function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 2000); }
+
+    function renderBase(){
+      $('#basePathChip').textContent = state.basePath || '(not set)';
+      $('#folderPath').value = state.basePath;
+      $('#chkRecursive').checked = state.recursive;
+      $('#chkDontDelete').checked = state.dontDelete;
+    }
+
+    function renderRows(){
+      const tbody = $('#rows');
+      tbody.innerHTML = '';
+      state.rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const frPreview = r.file_report_preview || '<span style="color:var(--muted)">—</span>';
+        const onPreview = r.organization_notes_preview || '<span style="color:var(--muted)">—</span>';
+        tr.innerHTML = `
+          <td class="mono truncate" title="${r.path_rel}">${r.path_rel}</td>
+          <td>
+            <div class="cell-flex">
+              <span class="preview truncate" title="${(r.file_report_preview||'').replace(/"/g,'&quot;')}">${frPreview}</span>
+              <button class="link-btn" data-view-report="${r.id}" ${r.has_file_report?'' : 'style="visibility:hidden"'}>View</button>
+            </div>
+          </td>
+          <td>
+            <div class="cell-flex">
+              <span class="preview truncate" title="${(r.organization_notes_preview||'').replace(/"/g,'&quot;')}">${onPreview}</span>
+              <button class="link-btn" data-view-notes="${r.id}" ${r.has_organization_notes?'' : 'style="visibility:hidden"'}>View</button>
+            </div>
+          </td>
+          <td>
+            <div style="display:flex; gap:6px; align-items:center">
+              <input class="plan-input readonly" readonly type="text" data-plan="${r.id}" value="${r.planned_dest||''}" placeholder="e.g. organized/personal/singapore/file.txt" />
+            </div>
+          </td>
+          <td class="mono truncate" title="${r.organized_path||''}">${r.organized_path || '<span style=\"color:var(--muted)\">—</span>'}</td>
+          <td class="mono">${r.created_at}</td>
+          <td class="mono">${r.updated_at}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openModal(title, body){
+      $('#modalTitle').textContent = title;
+      $('#modalBody').textContent = body || '(empty)';
+      $('#modal').classList.add('show');
+    }
+    function closeModal(){ $('#modal').classList.remove('show'); }
+
+    // --- One-action-at-a-time control ---
+    const mainBtnIds = ['btnScan','btnAnalyze','btnPlan','btnDecide','btnMove'];
+    function setActiveAction(name){
+      state.currentAction = name;
+      mainBtnIds.forEach(id=>{
+        const el = document.getElementById(id);
+        if(!el) return;
+        if(name===null){
+          el.disabled = false; el.classList.remove('disabled','active');
+          if(!el.dataset.manualGhost){ el.classList.add('ghost'); }
+        } else if(id === `btn${name[0].toUpperCase()+name.slice(1)}`){
+          el.disabled = false; el.classList.add('active'); el.classList.remove('ghost');
+        } else {
+          el.disabled = true; el.classList.add('disabled'); el.classList.remove('active');
+        }
+      });
+    }
+
+    // --- API ---
+    async function fetchJSON(url, opts={}){
+      const res = await fetch(url, opts);
+      if(!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function loadConfig(){
+      try{
+        const d = await fetchJSON('/api/config');
+        state.basePath = d.base_dir || '';
+        state.recursive = d.config?.recursive ?? true;
+        state.dontDelete = d.config?.dont_delete ?? true;
+        renderBase();
+      }catch(err){console.error(err);}
+    }
+
+    async function saveConfig(){
+      try{
+        await fetchJSON('/api/config', {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            base_dir: state.basePath || undefined,
+            recursive: state.recursive,
+            dont_delete: state.dontDelete
+          })
+        });
+      }catch(err){console.error(err);}
+    }
+
+    async function loadStatus(){
+      try{
+        const d = await fetchJSON('/api/status');
+        setActiveAction(d.current_action);
+        setStatus(d.status_text);
+      }catch(err){console.error(err);}
+    }
+
+    async function loadRows(){
+      const q = $('#searchInput').value.trim();
+      try{
+        const d = await fetchJSON('/api/files?q='+encodeURIComponent(q));
+        state.rows = d.rows;
+        renderRows();
+      }catch(err){console.error(err);}
+    }
+
+    async function fetchReport(id){
+      const d = await fetchJSON(`/api/files/${id}/report`);
+      openModal('File report · #'+id, d.file_report||'No report');
+    }
+
+    async function fetchNotes(id){
+      const d = await fetchJSON(`/api/files/${id}/notes`);
+      openModal('Organization notes · #'+id, d.organization_notes||'(no notes yet)');
+    }
+
+    async function updatePlannedDest(id, dest){
+      try{
+        await fetchJSON(`/api/files/${id}/planned_dest`, {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({planned_dest: dest})
+        });
+      }catch(err){console.error(err);}
+    }
+
+    async function startAction(name){
+      if(!state.basePath){ toast('Set a source folder first'); return; }
+      try{
+        const d = await fetchJSON(`/api/actions/${name}`, {method:'POST'});
+        setActiveAction(d.current_action);
+        setStatus(d.status_text);
+      }catch(err){
+        toast('Another action is running');
+      }
+    }
+
+    async function stopAll(){
+      try{
+        const d = await fetchJSON('/api/stop', {method:'POST'});
+        setActiveAction(d.current_action);
+        setStatus(d.status_text);
+        toast('All operations stopped');
+      }catch(err){console.error(err);}
+    }
+
+    // --- Event wiring ---
+    $('#browseBtn').addEventListener('click', ()=> $('#folderPicker').click());
+    $('#folderPicker').addEventListener('change', (e)=>{
+      const files = Array.from(e.target.files||[]);
+      if(files.length){
+        const p = files[0].webkitRelativePath || files[0].name;
+        const base = p.split('/')[0];
+        state.basePath = $('#folderPath').value || base; renderBase(); toast('Folder selected'); saveConfig();
+      }
+    });
+    $('#folderPickerPlan').addEventListener('change', (e)=>{
+      const files = Array.from(e.target.files||[]);
+      if(!files.length || state._planTargetId==null) return;
+      const first = files[0];
+      const relPath = first.webkitRelativePath || first.name;
+      const pickedFolder = (relPath.split('/')[0]) || '';
+      const id = state._planTargetId;
+      const input = document.querySelector(`input[data-plan="${id}"]`);
+      const row = state.rows.find(r=>r.id===id);
+      const filename = (row?.path_rel || '').split('/').pop() || '';
+      if(input){
+        input.value = `organized/${pickedFolder}/${filename}`.replace(/\/+/g, '/');
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+        toast('Planned destination updated from folder picker');
+      }
+      state._planTargetId = null;
+      e.target.value = '';
+    });
+
+    $('#folderPath').addEventListener('change', async e=>{ state.basePath = e.target.value.trim(); renderBase(); await saveConfig(); })
+    $('#chkRecursive').addEventListener('change', async e=>{ state.recursive = e.target.checked; await saveConfig(); })
+    $('#chkDontDelete').addEventListener('change', async e=>{ state.dontDelete = e.target.checked; await saveConfig(); })
+
+    mainBtnIds.forEach(id=> document.getElementById(id).addEventListener('click', (e)=>startAction(e.currentTarget.dataset.action)));
+    $('#btnStop').addEventListener('click', stopAll);
+
+    $('#searchInput').addEventListener('input', loadRows);
+
+    document.addEventListener('click', (e)=>{
+      if(e.target.id === 'closeModal' || e.target.id === 'modal'){ closeModal(); }
+      const btnRep = e.target.closest('button[data-view-report]');
+      if(btnRep){ fetchReport(Number(btnRep.getAttribute('data-view-report'))); }
+      const btnNotes = e.target.closest('button[data-view-notes]');
+      if(btnNotes){ fetchNotes(Number(btnNotes.getAttribute('data-view-notes'))); }
+
+      const planInput = e.target.closest('input[data-plan]');
+      if(planInput && planInput.hasAttribute('readonly')){
+        const id = Number(planInput.getAttribute('data-plan'));
+        if(state._clickTimers[id]) clearTimeout(state._clickTimers[id]);
+        state._clickTimers[id] = setTimeout(()=>{
+          state._planTargetId = id; $('#folderPickerPlan').click(); delete state._clickTimers[id];
+        }, 250);
+      }
+    });
+
+    document.addEventListener('dblclick', (e)=>{
+      const planInput = e.target.closest('input[data-plan]');
+      if(planInput){
+        const id = Number(planInput.getAttribute('data-plan'));
+        if(state._clickTimers[id]){ clearTimeout(state._clickTimers[id]); delete state._clickTimers[id]; }
+        planInput.removeAttribute('readonly');
+        planInput.classList.remove('readonly');
+        planInput.classList.add('editable');
+        planInput.focus();
+        planInput.selectionStart = planInput.selectionEnd = planInput.value.length;
+      }
+    });
+
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' && e.target.matches('input[data-plan].editable')){
+        e.preventDefault(); e.target.blur();
+      }
+      if(e.key === 'Escape' && e.target.matches('input[data-plan].editable')){
+        e.target.blur();
+      }
+    });
+
+    document.addEventListener('blur', async (e)=>{
+      if(e.target.matches('input[data-plan].editable')){
+        const inp = e.target;
+        const id = Number(inp.getAttribute('data-plan'));
+        await updatePlannedDest(id, inp.value);
+        const row = state.rows.find(r=>r.id===id);
+        if(row){ row.planned_dest = inp.value; row.updated_at = new Date().toISOString(); }
+        toast('Saved planned destination for #'+id);
+        inp.setAttribute('readonly','');
+        inp.classList.remove('editable'); inp.classList.add('readonly');
+      }
+    }, true);
+
+    // Initial load
+    (async function(){
+      await loadConfig();
+      await loadStatus();
+      await loadRows();
+    })();
+  </script>
 </body>
 </html>
+
