@@ -33,6 +33,7 @@ def test_agent_vector_db(tmp_path, monkeypatch):
 
     notes_res = db.append_organization_notes([ins1["id"]], "note1")
     assert ins1["id"] in notes_res["updated_ids"]
+    assert db.get_organization_notes("file1.txt")["organization_notes"].startswith("note1")
 
     db.set_planned_destination("file1.txt", "dest/a")
     db.set_final_destination("file1.txt", "final/a")
