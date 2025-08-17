@@ -86,6 +86,11 @@ class ConfigUpdate(BaseModel):
 class ResetPayload(BaseModel):
     base_dir: str
 
+
+class ScanPayload(BaseModel):
+    base_dir: Optional[str] = None
+    recursive: Optional[bool] = None
+
 class FileRow(BaseModel):
     id: int
     path_rel: str
@@ -194,11 +199,33 @@ def status():
     }
 
 @app.post("/api/actions/{action}", response_model=StatusOut)
-def start_action(action: Literal["scan", "analyze", "plan", "decide", "move"]):
+def start_action(
+    action: Literal["scan", "analyze", "plan", "decide", "move"],
+    payload: Optional[ScanPayload] = None,
+):
     try:
         runstate.start(action)
     except RuntimeError as e:  # pragma: no cover - networking
         raise HTTPException(status_code=409, detail=str(e))
+
+    if action == "scan":
+        base_dir = payload.base_dir if payload and payload.base_dir else db.config.get("base_dir")
+        recursive = payload.recursive if payload and payload.recursive is not None else db.config.get("recursive", True)
+        if not base_dir:
+            runstate.stop()
+            raise HTTPException(status_code=400, detail="base_dir not set")
+        db.save_config(base_dir=base_dir, recursive=recursive)
+        base_dir_abs = os.path.abspath(base_dir)
+        for root, dirs, files in os.walk(base_dir_abs):
+            for fname in files:
+                rel = os.path.relpath(os.path.join(root, fname), base_dir_abs)
+                db.insert(rel)
+            if not recursive:
+                break
+        runstate.stop()
+        runstate.status_text = "Idle"
+        return status()
+
     return status()
 
 @app.post("/api/stop", response_model=StatusOut)

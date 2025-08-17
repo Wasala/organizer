@@ -337,9 +337,15 @@
     async function startAction(name){
       if(!state.basePath){ toast('Set a source folder first'); return; }
       try{
-        const d = await fetchJSON(`/api/actions/${name}`, {method:'POST'});
+        const opts = {method:'POST'};
+        if(name==='scan'){
+          opts.headers = {'Content-Type':'application/json'};
+          opts.body = JSON.stringify({base_dir: state.basePath, recursive: state.recursive});
+        }
+        const d = await fetchJSON(`/api/actions/${name}`, opts);
         setActiveAction(d.current_action);
         setStatus(d.status_text);
+        if(name==='scan') await loadRows();
       }catch(err){
         toast('Another action is running');
       }
