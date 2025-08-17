@@ -367,6 +367,21 @@ class AgentVectorDB:
         return {"ok": True, "path_rel": path_rel, "file_report": row["file_report"]}
 
     @_safe_json
+    def get_organization_notes(self, path_from_base: str) -> dict:
+        path_rel = _norm_rel(path_from_base)
+        row = self.conn.execute(
+            "SELECT organization_notes FROM files WHERE path_rel=?",
+            (path_rel,),
+        ).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {path_rel}")
+        return {
+            "ok": True,
+            "path_rel": path_rel,
+            "organization_notes": row["organization_notes"],
+        }
+
+    @_safe_json
     def find_similar_file_reports(self, path_from_base: str, top_k: int | None = None) -> dict:
         path_rel = _norm_rel(path_from_base)
         row = self.conn.execute("SELECT id, file_report FROM files WHERE path_rel=?", (path_rel,)).fetchone()
