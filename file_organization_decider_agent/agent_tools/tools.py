@@ -45,6 +45,5 @@ def get_db() -> AgentVectorDB:
 
 def set_db(db: AgentVectorDB) -> None:
     """Replace the global database instance (primarily for tests)."""
-    global _db  # noqa: PLW0603
+    global _db  # pylint: disable=global-statement
     _db = db
-
