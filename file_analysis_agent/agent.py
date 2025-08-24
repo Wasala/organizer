@@ -1,6 +1,9 @@
 """PydanticAI agent exposing file analysis tools."""
 from __future__ import annotations
+
 from pathlib import Path
+import json
+from typing import Dict
 
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
@@ -9,24 +12,31 @@ from pydantic_ai.usage import UsageLimits
 
 from file_analysis_agent.agent_tools import tools
 
-system_prompt = Path("./prompt.md").read_text(encoding="utf-8")
-key = "we need to get tis from config.json"
+CONFIG_PATH = Path(__file__).with_name("config.json")
+PROMPT_PATH = Path(__file__).with_name("prompt.md")
 
-model = OpenAIModel('gpt-5-nano', provider=OpenAIProvider(api_key=key))
 
-# Configure the underlying LLM model. This is a placeholder string and can be
-# replaced by any model supported by PydanticAI in real usage.
-agent = Agent(
-    model=model,
-    system_prompt=system_prompt,
-    retries=2,
+def load_config() -> Dict[str, str]:
+    """Load configuration for the agent."""
+    with CONFIG_PATH.open(encoding="utf-8") as config_file:
+        return json.load(config_file)
 
-    )
 
+def build_agent() -> Agent:
+    """Create an :class:`Agent` configured for file analysis."""
+    config = load_config()
+    api_key = config.get("api_key")
+    model_name = config.get("model", "gpt-5-nano")
+    system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
+    model = OpenAIModel(model_name, provider=OpenAIProvider(api_key=api_key))
+    return Agent(model=model, system_prompt=system_prompt, retries=2)
+
+
+agent = build_agent()
 
 
 @agent.tool_plain
-def set(path: str) -> dict:
+def load_file(path: str) -> dict:
     """Load a file for analysis, converting and caching markdown as needed."""
     return tools.set(path, force=False)
 
@@ -51,7 +61,7 @@ def read_full_file() -> dict:
 
 @agent.tool_plain
 def find_within_doc(regex_string: str, max_hits: int = 50) -> dict:
-    """Find regex matches line by line in the cached markdown. Current regex flags: im"""
+    """Find regex matches line by line in the cached markdown."""
     return tools.find_within_doc(regex_string, max_hits=max_hits)
 
 
@@ -68,14 +78,32 @@ def get_file_metadata() -> dict:
 
 
 @agent.tool_plain
-def get_text_content_length() -> dict:
-    """Return no of lines textual content in the file."""
-    return tools.get_file_metadata()
+def get_text_content_length() -> int:
+    """Return the length of text content of the current file."""
+    return tools.get_text_content_length()
 
-def ask_file_analysis_agent(path, query="Please prepare the standard report after analyzing file:"):
-    agent_query = query + path
+
+def ask_file_analysis_agent(
+    path: str,
+    query: str = "Please prepare the standard report after analyzing file:",
+) -> str:
+    """Execute a query against the file analysis agent.
+
+    Parameters
+    ----------
+    path:
+        Path to the file to analyse.
+    query:
+        Prompt requesting the analysis. ``path`` is appended to this string.
+
+    Returns
+    -------
+    str
+        The agent's textual response.
+    """
+    agent_query = f"{query} {path}"
     response = agent.run_sync(agent_query, usage_limits=UsageLimits(request_limit=20))
     return response.output
 
-agent_output = ask_file_analysis_agent(path= "d:/laya-claim-6830304-2024-01-25.pdf")
-print(agent_output)
+
+__all__ = ["ask_file_analysis_agent", "agent"]
