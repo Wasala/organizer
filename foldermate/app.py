@@ -166,6 +166,29 @@ def _row_to_file_row(r) -> FileRow:
         has_organization_notes=bool(r["organization_notes"]),
     )
 
+
+def _analyze_pending_files(base_dir: str) -> None:
+    """Generate file reports for all files missing analysis.
+
+    The database is polled for the next file without a ``file_report`` entry.
+    Each file is analysed by :func:`file_analysis_agent.agent.ask_file_analysis_agent`
+    and the resulting report stored via :meth:`AgentVectorDB.set_file_report`.
+    The loop stops once there are no remaining files or a cancellation request
+    is detected through :data:`runstate.cancel_event`.
+    """
+
+    from file_analysis_agent.agent import ask_file_analysis_agent  # local import
+
+    base_dir_abs = os.path.abspath(base_dir)
+    while not runstate.cancel_event.is_set():
+        next_path = db.get_next_path_missing_file_report()
+        path_rel = next_path.get("path_rel") if isinstance(next_path, dict) else None
+        if not path_rel:
+            break
+        abs_path = os.path.join(base_dir_abs, path_rel)
+        report = ask_file_analysis_agent(abs_path)
+        db.set_file_report(path_rel, report)
+
 # ---------- Config ----------
 @app.get("/api/config", response_model=ConfigOut)
 def get_config():
@@ -244,6 +267,17 @@ def start_action(
                 db.insert(rel)
             if not recursive:
                 break
+        runstate.stop()
+        runstate.status_text = "Idle"
+        return status()
+
+    if action == "analyze":
+        try:
+            base_info = db.get_base_dir()
+        except Exception as exc:  # pragma: no cover - defensive
+            runstate.stop()
+            raise HTTPException(status_code=400, detail="base_dir not set") from exc
+        _analyze_pending_files(base_info["base_dir"])
         runstate.stop()
         runstate.status_text = "Idle"
         return status()
