@@ -186,6 +186,8 @@ def _analyze_pending_files(base_dir: str) -> None:
         if not path_rel:
             break
         abs_path = os.path.join(base_dir_abs, path_rel)
+        db.set_file_report(path_rel, "processing...")
+        runstate.status_text = f"Analyzing {path_rel}"
         report = ask_file_analysis_agent(abs_path)
         db.set_file_report(path_rel, report)
 

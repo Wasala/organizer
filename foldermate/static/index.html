@@ -194,6 +194,7 @@
       rows: [],
       _planTargetId: null,
       _clickTimers: {},
+      _refreshLoopRunning: false,
     };
 
     // --- Helpers ---
@@ -265,6 +266,7 @@
           el.disabled = true; el.classList.add('disabled'); el.classList.remove('active');
         }
       });
+      if(name){ refreshLoop(); }
     }
 
     // --- API ---
@@ -313,6 +315,19 @@
         state.rows = d.rows;
         renderRows();
       }catch(err){console.error(err);}
+    }
+
+    async function refreshLoop(){
+      if(state._refreshLoopRunning) return;
+      state._refreshLoopRunning = true;
+      try{
+        while(state.currentAction){
+          await Promise.all([loadStatus(), loadRows()]);
+          await new Promise(r=>setTimeout(r, 1000));
+        }
+      }finally{
+        state._refreshLoopRunning = false;
+      }
     }
 
     async function fetchReport(id){
