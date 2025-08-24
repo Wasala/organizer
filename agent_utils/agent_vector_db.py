@@ -94,7 +94,8 @@ class AgentVectorDB:
 
         self._prefix = "passage: "
         # embed() returns a generator; take the first vector to determine dimension
-        probe_vec = next(self.embedder.embed([self._prefix + "probe"]))
+        probe_iter = self.embedder.embed([self._prefix + "probe"])
+        probe_vec = next(iter(probe_iter))
         self._dim = int(len(probe_vec))
 
         self._ensure_schema()
@@ -437,5 +438,6 @@ class AgentVectorDB:
 
     def _embed_doc(self, text: str) -> np.ndarray:
         # embed() yields a generator of vectors; take the first and return float32 ndarray
-        vec = next(self.embedder.embed([self._prefix + text]))
+        vec_iter = self.embedder.embed([self._prefix + text])
+        vec = next(iter(vec_iter))
         return np.asarray(vec, dtype=np.float32)
