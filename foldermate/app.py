@@ -170,7 +170,29 @@ def _row_to_file_row(r) -> FileRow:
 @app.get("/api/config", response_model=ConfigOut)
 def get_config():
     base = db.get_base_dir()
+    print(base)
     return {"ok": True, "config": db.config, "base_dir": base["base_dir"]}
+
+# --- Native folder picker (local-only) ---
+@app.get("/api/pick_folder", response_model=Dict[str, Any])
+def pick_folder():
+    try:
+        # Opens a native folder dialog on the server machine (works when running locally)
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        # bring dialog to front on Windows
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+        path = filedialog.askdirectory(title="Select source folder") or ""
+        root.destroy()
+        return {"ok": bool(path), "path": path}
+    except Exception as e:
+        # If tkinter isn't available (e.g., headless), return a friendly error
+        raise HTTPException(status_code=500, detail=f"Folder picker failed: {e}")
 
 @app.put("/api/config", response_model=ConfigOut)
 def put_config(payload: ConfigUpdate):

@@ -14,7 +14,7 @@ Configuration example (save as organizer.config.json):
 {
   "db_path": "organizer.sqlite",
   "base_dir": "C:/cat",
-  "embedding_model": null,
+  "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
   "search": { "top_k": 10, "score_round": 4 },
   "sqlite": { "wal": true, "synchronous": "NORMAL", "cache_size_mb": 64, "temp_store_memory": true }
 }
@@ -68,7 +68,8 @@ def _safe_json(fn):
 DEFAULT_CONFIG = {
     "db_path": "organizer.sqlite",
     "base_dir": ".",
-    "embedding_model": None,
+    # Use a concrete model string; fastembed expects a string, not None
+    "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
     "search": {"top_k": 10, "score_round": 4},
     "sqlite": {
         "wal": True,
@@ -86,9 +87,16 @@ class AgentVectorDB:
         self.config_path = config_path
         self.config = self._load_or_create_config(config_path)
         self.conn = self._connect_and_load_vec()
-        self.embedder = TextEmbedding(model_name=self.config.get("embedding_model"))
+
+        # --- FastEmbed model (ensure a non-empty string) ---
+        model_name = self.config.get("embedding_model") or "nomic-ai/nomic-embed-text-v1.5"
+        self.embedder = TextEmbedding(model_name=model_name)
+
         self._prefix = "passage: "
-        self._dim = int(len(self.embedder.embed([self._prefix + "probe"])[0]))
+        # embed() returns a generator; take the first vector to determine dimension
+        probe_vec = next(self.embedder.embed([self._prefix + "probe"]))
+        self._dim = int(len(probe_vec))
+
         self._ensure_schema()
 
     @classmethod
@@ -110,6 +118,7 @@ class AgentVectorDB:
             return json.loads(json.dumps(DEFAULT_CONFIG))
         with open(path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+
         def deep_merge(default: dict, user: dict) -> dict:
             out = dict(default)
             for k, v in user.items():
@@ -118,11 +127,17 @@ class AgentVectorDB:
                 else:
                     out[k] = v
             return out
+
         return deep_merge(DEFAULT_CONFIG, cfg)
 
     def _connect_and_load_vec(self) -> sqlite3.Connection:
-        db = sqlite3.connect(self.config["db_path"])
+        # Allow use across FastAPI worker threads and avoid “created in a different thread”
+        db = sqlite3.connect(self.config["db_path"], check_same_thread=False)
         db.row_factory = sqlite3.Row
+
+        # Be kinder under concurrent access
+        db.execute("PRAGMA busy_timeout=5000")
+
         s = self.config.get("sqlite", {})
         if s.get("wal", True):
             db.execute("PRAGMA journal_mode=WAL")
@@ -132,6 +147,7 @@ class AgentVectorDB:
         cache_mb = int(s.get("cache_size_mb", 64))
         db.execute(f"PRAGMA cache_size={-cache_mb * 1024}")
         db.execute("PRAGMA foreign_keys=ON")
+
         db.enable_load_extension(True)
         sqlite_vec.load(db)
         db.enable_load_extension(False)
@@ -420,5 +436,6 @@ class AgentVectorDB:
         return {"ok": True, "results": results}
 
     def _embed_doc(self, text: str) -> np.ndarray:
-        vec = self.embedder.embed([self._prefix + text])[0]
+        # embed() yields a generator of vectors; take the first and return float32 ndarray
+        vec = next(self.embedder.embed([self._prefix + text]))
         return np.asarray(vec, dtype=np.float32)

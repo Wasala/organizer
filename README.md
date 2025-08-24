@@ -1,3 +1,6 @@
+# Running 
+(foldermate) drive:\path\organizer>uvicorn foldermate.app:app --reload
+
 # File Analysis Agent
 
 Utilities for converting a single local document to Markdown and exposing light‑weight

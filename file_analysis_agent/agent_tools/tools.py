@@ -40,6 +40,9 @@ def get_file_metadata() -> dict:
     """Return metadata about the current file and cache entry."""
     return analyzer.get_file_metadata()
 
+def get_text_content_length() -> int:
+    """Return the length of text content of current file."""
+    return analyzer.text_content_length()
 
 def delete_cache(path: str) -> dict:
     """Remove cached markdown/metadata for ``path`` if present."""

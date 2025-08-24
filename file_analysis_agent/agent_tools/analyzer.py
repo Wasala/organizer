@@ -117,6 +117,12 @@ class FileAnalyzer:
         text = "\n".join(self.current_lines[start - 1 : end])
         return SliceOutput(start_line=start, end_line=end, text=self._truncate(text)).model_dump()
 
+    def text_content_length(self) -> int:
+        err = self._ensure_loaded()
+        if err:
+            return err
+        return len(self.current_lines)
+
     def tail(self, num_lines: int = 50) -> dict:
         err = self._ensure_loaded()
         if err:

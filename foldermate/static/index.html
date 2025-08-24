@@ -140,6 +140,7 @@
           <button id="btnMove" class="main ghost" data-action="move">Start/Resume moving</button>
           <span style="flex:1"></span>
           <button id="btnStop" class="danger">STOP ALL</button>
+          <button id="btnReset" class="ghost" style="border:1px solid var(--danger); color:var(--danger)">Reset (wipe DB)</button>
         </div>
       </div>
     </details>
@@ -361,7 +362,25 @@
     }
 
     // --- Event wiring ---
-    $('#browseBtn').addEventListener('click', ()=> $('#folderPicker').click());
+    $('#browseBtn').addEventListener('click', async () => {
+      // Try native folder picker via backend
+      try {
+        const r = await fetchJSON('/api/pick_folder');
+        if (r.ok && r.path) {
+          state.basePath = r.path;
+          renderBase();
+          await saveConfig();
+          toast('Folder selected');
+          return;
+        }
+      } catch (e) {
+        // ignore; we’ll fallback below
+      }
+
+      // Fallback: use the hidden input (will NOT upload—just selects a folder)
+      $('#folderPicker').click();
+    });
+
     $('#folderPicker').addEventListener('change', (e)=>{
       const files = Array.from(e.target.files||[]);
       if(files.length){
@@ -395,6 +414,31 @@
 
     mainBtnIds.forEach(id=> document.getElementById(id).addEventListener('click', (e)=>startAction(e.currentTarget.dataset.action)));
     $('#btnStop').addEventListener('click', stopAll);
+    $('#btnReset').addEventListener('click', async () => {
+      if (!state.basePath) {
+        toast('Set a source folder first');
+        return;
+      }
+      const yes = confirm(
+        'Reset will wipe the database and reinitialize it for the current base folder.\nContinue?'
+      );
+      if (!yes) return;
+
+      try {
+        await fetchJSON('/api/reset', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ base_dir: state.basePath })
+        });
+        toast('Database reset');
+        await loadRows();
+        await loadStatus();
+      } catch (err) {
+        console.error(err);
+        toast('Reset failed (see console)');
+      }
+    });
+
 
     $('#searchInput').addEventListener('input', loadRows);
 
