@@ -325,6 +325,7 @@
     async function loadStatus(){
       try{
         const d = await fetchJSON('/api/status');
+        console.log('Status update', d);
         setActiveAction(d.current_action);
         setStatus(d.status_text);
       }catch(err){console.error(err);}
@@ -374,6 +375,7 @@
 
     async function startAction(name){
       if(!state.basePath){ toast('Set a source folder first'); return; }
+      console.log('Starting action', name);
       try{
         const opts = {method:'POST'};
         if(name==='scan'){
@@ -381,10 +383,12 @@
           opts.body = JSON.stringify({base_dir: state.basePath, recursive: state.recursive});
         }
         const d = await fetchJSON(`/api/actions/${name}`, opts);
+        console.log('Action response', d);
         setActiveAction(d.current_action);
         setStatus(d.status_text);
         if(name==='scan') await loadRows();
       }catch(err){
+        console.error(err);
         toast('Another action is running');
       }
     }
