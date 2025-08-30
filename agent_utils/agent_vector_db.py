@@ -324,6 +324,30 @@ class AgentVectorDB:
         return {"ok": True, "id": file_id, "path_rel": path_rel}
 
     @_safe_json
+    def clear_processing_file_reports(self) -> dict:
+        """Remove placeholder ``file_report`` entries left mid-analysis.
+
+        If the application stops while a file is being analysed, the
+        ``file_report`` column may contain one of the
+        :data:`PROCESSING_SENTINELS`.  On the next start we want such
+        files to appear as pending rather than perpetually "processing".
+        This method clears those markers.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result with the count of cleared rows under the
+            ``cleared`` key.
+        """
+
+        cur = self.conn.execute(
+            "UPDATE files SET file_report='', updated_at=? WHERE file_report IN (?, ?)",
+            (_iso_now(), *PROCESSING_SENTINELS),
+        )
+        self.conn.commit()
+        return {"ok": True, "cleared": int(cur.rowcount)}
+
+    @_safe_json
     def append_organization_notes(self, ids: T.Iterable[int], notes_to_append: str) -> dict:
         ids = [int(i) for i in ids]
         if not ids:
