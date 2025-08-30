@@ -38,6 +38,11 @@ def test_decider_tools(tmp_path, monkeypatch):
     (base / "a.txt").write_text("")
     (base / "b.txt").write_text("")
 
+    db.save_config(instructions="Keep PDFs in docs")
+
+    instr = decider_tools.get_folder_instructions()
+    assert instr["instructions"] == "Keep PDFs in docs"
+
     notes = decider_tools.append_organization_notes([ins1["id"]], "note1")
     assert ins1["id"] in notes["updated_ids"]
 

@@ -33,6 +33,11 @@ def get_organization_notes(path: str) -> dict:
     return _db.get_organization_notes(path)
 
 
+def get_folder_instructions() -> dict:
+    """Retrieve user folder organization instructions."""
+    return _db.get_instructions()
+
+
 def target_folder_tree(path: str) -> str:
     """Return a folder tree for ``path`` with a heading."""
     return _target_folder_tree(path)

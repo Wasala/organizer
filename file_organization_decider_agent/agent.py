@@ -39,6 +39,12 @@ def get_organization_notes(path: str) -> dict:
 
 
 @agent.tool_plain
+def get_folder_instructions() -> dict:
+    """Return user folder organization instructions."""
+    return tools.get_folder_instructions()
+
+
+@agent.tool_plain
 def target_folder_tree(path: str) -> str:
     """Return a folder tree for ``path`` with a heading."""
     return tools.target_folder_tree(path)

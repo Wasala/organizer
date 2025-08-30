@@ -274,6 +274,20 @@ class AgentVectorDB:
         return {"ok": True, "base_dir": row["value"]}
 
     @_safe_json
+    def get_instructions(self) -> dict:
+        """Return user folder organization instructions.
+
+        The instructions are stored in the ``config`` table under the
+        ``instructions`` key.  If no instructions have been saved, an empty
+        string is returned.
+        """
+
+        row = self.conn.execute(
+            "SELECT value FROM config WHERE key='instructions'"
+        ).fetchone()
+        return {"ok": True, "instructions": row["value"] if row else ""}
+
+    @_safe_json
     def insert(self, path_from_base: str) -> dict:
         path_rel = _norm_rel(path_from_base)
         now = _iso_now()
