@@ -324,9 +324,22 @@ def start_action(
         except Exception as exc:  # pragma: no cover - defensive
             runstate.stop()
             raise HTTPException(status_code=400, detail="base_dir not set") from exc
-        _analyze_pending_files(base_info["base_dir"])
-        runstate.stop()
-        runstate.status_text = "Idle"
+
+        def worker() -> None:
+            """Run analysis in a background thread.
+
+            The function processes pending files and resets the run state once
+            finished. It also ensures the state is cleared even if analysis
+            raises an unexpected exception.
+            """
+
+            try:
+                _analyze_pending_files(base_info["base_dir"])
+            finally:
+                runstate.stop()
+                runstate.status_text = "Idle"
+
+        threading.Thread(target=worker, daemon=True).start()
         return status()
 
     return status()
