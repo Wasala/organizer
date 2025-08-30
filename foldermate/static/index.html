@@ -426,7 +426,24 @@
         state.basePath = $('#folderPath').value || base; renderBase(); toast('Folder selected'); saveConfig();
       }
     });
-    $('#browseTargetBtn').addEventListener('click', ()=> $('#targetPicker').click());
+    $('#browseTargetBtn').addEventListener('click', async () => {
+      // Try native folder picker via backend
+      try {
+        const r = await fetchJSON('/api/pick_folder');
+        if (r.ok && r.path) {
+          state.targetPath = r.path;
+          renderBase();
+          await saveConfig();
+          toast('Target folder selected');
+          return;
+        }
+      } catch (e) {
+        // ignore; we'll fallback below
+      }
+
+      // Fallback: use the hidden input (will NOT upload—just selects a folder)
+      $('#targetPicker').click();
+    });
     $('#targetPicker').addEventListener('change', (e)=>{
       const files = Array.from(e.target.files||[]);
       if(files.length){
