@@ -1,6 +1,8 @@
 {
   "db_path": "organizer.sqlite",
   "base_dir": "D:\\_dev",
+  "target_dir": "D:\\_organized",
+  "instructions": "",
   "embedding_model": "BAAI/bge-small-en-v1.5",
   "search": {
     "top_k": 10,

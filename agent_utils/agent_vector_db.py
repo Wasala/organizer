@@ -68,6 +68,8 @@ def _safe_json(fn):
 DEFAULT_CONFIG = {
     "db_path": "organizer.sqlite",
     "base_dir": ".",
+    "target_dir": "",
+    "instructions": "",
     # Use a concrete model string; fastembed expects a string, not None
     "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
     "search": {"top_k": 10, "score_round": 4},
@@ -106,7 +108,26 @@ class AgentVectorDB:
 
     @_safe_json
     def save_config(self, **overrides) -> dict:
-        self.config.update(overrides)
+        """Persist configuration overrides.
+
+        Any provided keyword arguments are merged into the in-memory configuration,
+        saved to the JSON config file and upserted into the ``config`` table within
+        the SQLite database. Paths are stored as absolute paths.
+        """
+
+        c = self.conn
+        for key, value in overrides.items():
+            if value is None:
+                continue
+            if key in {"base_dir", "target_dir"}:
+                value = os.path.abspath(str(value))
+            self.config[key] = value
+            stored = json.dumps(value) if not isinstance(value, str) else value
+            c.execute(
+                "INSERT OR REPLACE INTO config(key, value) VALUES(?, ?)",
+                (key, stored),
+            )
+        c.commit()
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=2)
         return {"ok": True, "config_path": self.config_path, "config": self.config}
@@ -207,6 +228,13 @@ class AgentVectorDB:
                 "INSERT INTO config(key, value) VALUES('base_dir', ?)",
                 (os.path.abspath(self.config["base_dir"]),),
             )
+        for key in ("target_dir", "instructions"):
+            val = self.config.get(key)
+            if val is not None:
+                c.execute(
+                    "INSERT OR IGNORE INTO config(key, value) VALUES(?, ?)",
+                    (key, val),
+                )
         c.commit()
 
     @_safe_json
@@ -222,6 +250,8 @@ class AgentVectorDB:
             PRAGMA foreign_keys=ON;
             """
         )
+        self.config.pop("target_dir", None)
+        self.config.pop("instructions", None)
         self._ensure_schema()
         c.execute(
             "INSERT OR REPLACE INTO config(key, value) VALUES('base_dir', ?)",

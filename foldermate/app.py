@@ -1,5 +1,6 @@
-# FastAPI layer for FolderMate
+"""FastAPI layer for FolderMate."""
 # pip install fastapi uvicorn pydantic sqlite-vec fastembed numpy
+# pylint: disable=missing-function-docstring
 
 from __future__ import annotations
 from typing import List, Optional, Literal, Dict, Any
@@ -7,11 +8,11 @@ from datetime import datetime
 import threading, time
 import os
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, validator
+from fastapi import FastAPI, HTTPException  # pylint: disable=import-error
+from fastapi.middleware.cors import CORSMiddleware  # pylint: disable=import-error
+from fastapi.responses import FileResponse  # pylint: disable=import-error
+from fastapi.staticfiles import StaticFiles  # pylint: disable=import-error
+from pydantic import BaseModel, Field
 
 from agent_utils.agent_vector_db import AgentVectorDB
 
@@ -40,6 +41,8 @@ db = AgentVectorDB("organizer.config.json")
 
 # ---------- Single-action state ----------
 class RunState:
+    """Track the state of a long-running action."""
+
     def __init__(self):
         self._lock = threading.Lock()
         self.current_action: Optional[str] = None  # "scan" | "analyze" | ...
@@ -74,24 +77,37 @@ runstate = RunState()
 
 # ---------- Schemas ----------
 class ConfigOut(BaseModel):
+    """Configuration response."""
+
     ok: bool = True
     config: Dict[str, Any]
     base_dir: str
+    target_dir: Optional[str] = None
 
 class ConfigUpdate(BaseModel):
+    """Configuration update payload."""
+
     base_dir: Optional[str] = None
+    target_dir: Optional[str] = None
+    instructions: Optional[str] = None
     recursive: Optional[bool] = None
     dont_delete: Optional[bool] = None
 
 class ResetPayload(BaseModel):
+    """Payload for database reset."""
+
     base_dir: str
 
 
 class ScanPayload(BaseModel):
+    """Payload for scan action."""
+
     base_dir: Optional[str] = None
     recursive: Optional[bool] = None
 
 class FileRow(BaseModel):
+    """Compact file row used in listings."""
+
     id: int
     path_rel: str
     file_report_preview: Optional[str] = None
@@ -104,6 +120,8 @@ class FileRow(BaseModel):
     has_organization_notes: bool
 
 class FileRowFull(BaseModel):
+    """Full file details including notes and destinations."""
+
     ok: bool = True
     id: int
     path_rel: str
@@ -115,6 +133,8 @@ class FileRowFull(BaseModel):
     updated_at: str
 
 class FilesListOut(BaseModel):
+    """Paginated list of files."""
+
     ok: bool = True
     page: int
     page_size: int
@@ -122,25 +142,37 @@ class FilesListOut(BaseModel):
     rows: List[FileRow]
 
 class InsertFilePayload(BaseModel):
+    """Payload for inserting a file path."""
+
     path_rel: str
 
 class PlannedDestUpdate(BaseModel):
+    """Update for planned destination."""
+
     planned_dest: str
 
 class NotesAppend(BaseModel):
+    """Append notes to multiple files."""
+
     ids: List[int]
     text: str
 
 class FileReportUpdate(BaseModel):
+    """Update for a file report."""
+
     file_report: str
 
 class StatusOut(BaseModel):
+    """Status output for long-running actions."""
+
     ok: bool = True
     current_action: Optional[str]
     status_text: str
     started_at: Optional[str] = None
 
 class SimilarOut(BaseModel):
+    """Similar files output."""
+
     ok: bool = True
     results: List[Dict[str, Any]]
 
@@ -177,7 +209,7 @@ def _analyze_pending_files(base_dir: str) -> None:
     is detected through :data:`runstate.cancel_event`.
     """
 
-    from file_analysis_agent.agent import ask_file_analysis_agent  # local import
+    from file_analysis_agent.agent import ask_file_analysis_agent  # pylint: disable=import-outside-toplevel
 
     base_dir_abs = os.path.abspath(base_dir)
     while not runstate.cancel_event.is_set():
@@ -195,16 +227,20 @@ def _analyze_pending_files(base_dir: str) -> None:
 @app.get("/api/config", response_model=ConfigOut)
 def get_config():
     base = db.get_base_dir()
-    print(base)
-    return {"ok": True, "config": db.config, "base_dir": base["base_dir"]}
+    return {
+        "ok": True,
+        "config": db.config,
+        "base_dir": base["base_dir"],
+        "target_dir": db.config.get("target_dir"),
+    }
 
 # --- Native folder picker (local-only) ---
 @app.get("/api/pick_folder", response_model=Dict[str, Any])
 def pick_folder():
     try:
         # Opens a native folder dialog on the server machine (works when running locally)
-        import tkinter as tk
-        from tkinter import filedialog
+        import tkinter as tk  # pylint: disable=import-outside-toplevel
+        from tkinter import filedialog  # pylint: disable=import-outside-toplevel
         root = tk.Tk()
         root.withdraw()
         # bring dialog to front on Windows
@@ -215,21 +251,30 @@ def pick_folder():
         path = filedialog.askdirectory(title="Select source folder") or ""
         root.destroy()
         return {"ok": bool(path), "path": path}
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         # If tkinter isn't available (e.g., headless), return a friendly error
-        raise HTTPException(status_code=500, detail=f"Folder picker failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Folder picker failed: {e}") from e
 
 @app.put("/api/config", response_model=ConfigOut)
 def put_config(payload: ConfigUpdate):
     if payload.base_dir:
         db.save_config(base_dir=payload.base_dir)
+    if payload.target_dir:
+        db.save_config(target_dir=payload.target_dir)
+    if payload.instructions is not None:
+        db.save_config(instructions=payload.instructions)
     # you can also persist recursive/dont_delete if you store them in config
     if payload.recursive is not None:
         db.save_config(recursive=payload.recursive)
     if payload.dont_delete is not None:
         db.save_config(dont_delete=payload.dont_delete)
     base = db.get_base_dir()
-    return {"ok": True, "config": db.config, "base_dir": base["base_dir"]}
+    return {
+        "ok": True,
+        "config": db.config,
+        "base_dir": base["base_dir"],
+        "target_dir": db.config.get("target_dir"),
+    }
 
 @app.post("/api/reset", response_model=Dict[str, Any])
 def reset(payload: ResetPayload):
@@ -253,7 +298,7 @@ def start_action(
     try:
         runstate.start(action)
     except RuntimeError as e:  # pragma: no cover - networking
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
     if action == "scan":
         base_dir = payload.base_dir if payload and payload.base_dir else db.config.get("base_dir")
@@ -263,7 +308,7 @@ def start_action(
             raise HTTPException(status_code=400, detail="base_dir not set")
         db.save_config(base_dir=base_dir, recursive=recursive)
         base_dir_abs = os.path.abspath(base_dir)
-        for root, dirs, files in os.walk(base_dir_abs):
+        for root, _dirs, files in os.walk(base_dir_abs):
             for fname in files:
                 rel = os.path.relpath(os.path.join(root, fname), base_dir_abs)
                 db.insert(rel)
