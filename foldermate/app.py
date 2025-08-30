@@ -38,6 +38,7 @@ def ui_root():
     return FileResponse(INDEX_PATH)
 
 db = AgentVectorDB("organizer.config.json")
+db.clear_processing_file_reports()
 
 # ---------- Single-action state ----------
 class RunState:

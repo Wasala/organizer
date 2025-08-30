@@ -1,5 +1,4 @@
-import os
-from agent_utils.agent_vector_db import AgentVectorDB
+from agent_utils.agent_vector_db import AgentVectorDB, PROCESSING_SENTINELS
 
 
 class FakeEmbedder:
@@ -61,3 +60,19 @@ def test_agent_vector_db(tmp_path, monkeypatch):
 
     # config save
     assert db.save_config(search={"top_k": 5})["ok"]
+
+
+def test_clear_processing_file_reports(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "cfg.json"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "b"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    db.insert("foo.txt")
+    db.set_file_report("foo.txt", PROCESSING_SENTINELS[0])
+    assert db.get_file_report("foo.txt")["file_report"] == PROCESSING_SENTINELS[0]
+    res = db.clear_processing_file_reports()
+    assert res["cleared"] == 1
+    assert db.get_file_report("foo.txt")["file_report"] == ""
+    assert db.get_next_path_missing_file_report()["path_rel"] == "foo.txt"
