@@ -122,6 +122,20 @@
           </div>
         </div>
         <div class="row">
+          <label for="targetPicker">Target path (organized files destination)</label>
+          <input id="targetPath" type="text" placeholder="e.g. C:/organized" />
+          <div>
+            <label class="mono" style="display:none" for="targetPicker">Folder picker</label>
+            <input id="targetPicker" type="file" webkitdirectory directory multiple style="display:none" />
+            <button class="ghost" id="browseTargetBtn">Browse…</button>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <label for="instructionsBox" style="margin-top:4px">Folder organization instructions/guidelines</label>
+          <textarea id="instructionsBox" rows="10" placeholder="e.g. PDFs to /docs; images to /photos"></textarea>
+          <div></div>
+        </div>
+        <div class="row">
           <label>Recurse subfolders</label>
           <input id="chkRecursive" type="checkbox" checked />
           <div></div>
@@ -187,6 +201,8 @@
     // --- State ---
     const state = {
       basePath: '',
+      targetPath: '',
+      instructions: '',
       recursive: true,
       dontDelete: true,
       status: 'Pending user input',
@@ -205,6 +221,8 @@
     function renderBase(){
       $('#basePathChip').textContent = state.basePath || '(not set)';
       $('#folderPath').value = state.basePath;
+      $('#targetPath').value = state.targetPath;
+      $('#instructionsBox').value = state.instructions;
       $('#chkRecursive').checked = state.recursive;
       $('#chkDontDelete').checked = state.dontDelete;
     }
@@ -280,6 +298,8 @@
       try{
         const d = await fetchJSON('/api/config');
         state.basePath = d.base_dir || '';
+        state.targetPath = d.config?.target_dir || '';
+        state.instructions = d.config?.instructions || '';
         state.recursive = d.config?.recursive ?? true;
         state.dontDelete = d.config?.dont_delete ?? true;
         renderBase();
@@ -293,6 +313,8 @@
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             base_dir: state.basePath || undefined,
+            target_dir: state.targetPath || undefined,
+            instructions: state.instructions || undefined,
             recursive: state.recursive,
             dont_delete: state.dontDelete
           })
@@ -404,6 +426,15 @@
         state.basePath = $('#folderPath').value || base; renderBase(); toast('Folder selected'); saveConfig();
       }
     });
+    $('#browseTargetBtn').addEventListener('click', ()=> $('#targetPicker').click());
+    $('#targetPicker').addEventListener('change', (e)=>{
+      const files = Array.from(e.target.files||[]);
+      if(files.length){
+        const p = files[0].webkitRelativePath || files[0].name;
+        const base = p.split('/')[0];
+        state.targetPath = $('#targetPath').value || base; renderBase(); toast('Target folder selected'); saveConfig();
+      }
+    });
     $('#folderPickerPlan').addEventListener('change', (e)=>{
       const files = Array.from(e.target.files||[]);
       if(!files.length || state._planTargetId==null) return;
@@ -424,6 +455,8 @@
     });
 
     $('#folderPath').addEventListener('change', async e=>{ state.basePath = e.target.value.trim(); renderBase(); await saveConfig(); })
+    $('#targetPath').addEventListener('change', async e=>{ state.targetPath = e.target.value.trim(); renderBase(); await saveConfig(); })
+    $('#instructionsBox').addEventListener('change', async e=>{ state.instructions = e.target.value; renderBase(); await saveConfig(); })
     $('#chkRecursive').addEventListener('change', async e=>{ state.recursive = e.target.checked; await saveConfig(); })
     $('#chkDontDelete').addEventListener('change', async e=>{ state.dontDelete = e.target.checked; await saveConfig(); })
 
