@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse  # pylint: disable=import-error
 from fastapi.staticfiles import StaticFiles  # pylint: disable=import-error
 from pydantic import BaseModel, Field
 
-from agent_utils.agent_vector_db import AgentVectorDB
+from agent_utils.agent_vector_db import AgentVectorDB, PROCESSING_SENTINELS
 
 # ---------- App + CORS ----------
 BASE_DIR = os.path.dirname(__file__)
@@ -194,7 +194,7 @@ def _row_to_file_row(r) -> FileRow:
         organized_path=r["final_dest"],
         created_at=r["created_at"],
         updated_at=r["updated_at"],
-        has_file_report=bool(r["file_report"]),
+        has_file_report=bool(r["file_report"] and r["file_report"] not in PROCESSING_SENTINELS),
         has_organization_notes=bool(r["organization_notes"]),
     )
 
@@ -218,7 +218,7 @@ def _analyze_pending_files(base_dir: str) -> None:
         if not path_rel:
             break
         abs_path = os.path.join(base_dir_abs, path_rel)
-        db.set_file_report(path_rel, "processing...")
+        db.set_file_report(path_rel, PROCESSING_SENTINELS[0])
         runstate.status_text = f"Analyzing {path_rel}"
         report = ask_file_analysis_agent(abs_path)
         db.set_file_report(path_rel, report)

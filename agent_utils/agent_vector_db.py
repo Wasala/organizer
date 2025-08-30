@@ -81,6 +81,9 @@ DEFAULT_CONFIG = {
     },
 }
 
+# Placeholder markers used when a file analysis is in progress.
+PROCESSING_SENTINELS = ("processing...", "processing..")
+
 
 class AgentVectorDB:
     """Semantic vector database for file organization."""
@@ -364,7 +367,13 @@ class AgentVectorDB:
     @_safe_json
     def get_next_path_missing_file_report(self) -> dict:
         row = self.conn.execute(
-            "SELECT path_rel FROM files WHERE IFNULL(TRIM(file_report),'')='' ORDER BY id ASC LIMIT 1"
+            """
+            SELECT path_rel FROM files
+            WHERE IFNULL(TRIM(file_report),'')=''
+               OR file_report IN (?, ?)
+            ORDER BY id ASC LIMIT 1
+            """,
+            PROCESSING_SENTINELS,
         ).fetchone()
         return {"ok": True, "path_rel": row["path_rel"] if row else None}
 
