@@ -39,6 +39,11 @@ def test_planner_tools(tmp_path, monkeypatch):
     (base / "a.txt").write_text("")
     (base / "b.txt").write_text("")
 
+    db.save_config(instructions="Keep PDFs in docs")
+
+    instr = planner_tools.get_folder_instructions()
+    assert instr["instructions"] == "Keep PDFs in docs"
+
     rep = planner_tools.get_file_report("a.txt")
     assert rep["file_report"] == "hello world"
 

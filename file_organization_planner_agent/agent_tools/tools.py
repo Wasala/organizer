@@ -25,6 +25,11 @@ def get_file_report(path: str) -> dict:
     return _db.get_file_report(path)
 
 
+def get_folder_instructions() -> dict:
+    """Retrieve user folder organization instructions."""
+    return _db.get_instructions()
+
+
 
 def get_db() -> AgentVectorDB:
     """Return the global database instance (primarily for tests)."""

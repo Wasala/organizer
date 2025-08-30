@@ -24,6 +24,9 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     assert db.reset_db(str(base_dir))["ok"]
     assert db.get_base_dir()["base_dir"] == str(base_dir)
 
+    db.save_config(instructions="Keep PDFs in docs")
+    assert db.get_instructions()["instructions"] == "Keep PDFs in docs"
+
     ins1 = db.insert("file1.txt")
     ins2 = db.insert("file2.txt")
     db.set_file_report("file1.txt", "hello world")
