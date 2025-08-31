@@ -315,11 +315,15 @@ class AgentVectorDB:
             "UPDATE files SET file_report=?, updated_at=? WHERE id=?",
             (text, _iso_now(), file_id),
         )
-        emb = self._embed_doc(text)
-        self.conn.execute(
-            "INSERT OR REPLACE INTO vec_file_report(file_id, embedding, path_rel) VALUES(?,?,?)",
-            (file_id, emb, path_rel),
-        )
+        try:
+            emb = self._embed_doc(text)
+            self.conn.execute(
+                "INSERT OR REPLACE INTO vec_file_report(file_id, embedding, path_rel) VALUES(?,?,?)",
+                (file_id, emb, path_rel),
+            )
+        except Exception:  # pylint: disable=broad-except
+            # Even if embedding fails we still want the report persisted.
+            pass
         self.conn.commit()
         return {"ok": True, "id": file_id, "path_rel": path_rel}
 

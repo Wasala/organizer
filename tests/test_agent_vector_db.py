@@ -14,6 +14,24 @@ class FakeEmbedder:
         return vectors
 
 
+class FailingEmbedder:
+    """Embedder that fails after the first call to :meth:`embed`."""
+
+    def __init__(self, model_name=None):
+        self._calls = 0
+
+    def embed(self, texts):
+        self._calls += 1
+        if self._calls > 1:
+            raise RuntimeError("boom")
+        vectors = []
+        for t in texts:
+            l = len(t)
+            s = sum(ord(c) for c in t)
+            vectors.append([float(l), float(s % 97), float((l * s) % 53)])
+        return vectors
+
+
 def test_agent_vector_db(tmp_path, monkeypatch):
     monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
     config_path = tmp_path / "config.json"
@@ -76,3 +94,18 @@ def test_clear_processing_file_reports(tmp_path, monkeypatch):
     assert res["cleared"] == 1
     assert db.get_file_report("foo.txt")["file_report"] == ""
     assert db.get_next_path_missing_file_report()["path_rel"] == "foo.txt"
+
+
+def test_set_file_report_handles_embedding_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FailingEmbedder)
+    config_path = tmp_path / "f.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    db.insert("foo.txt")
+
+    # Should still persist even though embedding fails
+    res = db.set_file_report("foo.txt", "hello")
+    assert res["ok"]
+    assert db.get_file_report("foo.txt")["file_report"] == "hello"
