@@ -8,6 +8,7 @@
     "top_k": 10,
     "score_round": 4
   },
+  "log_dir": "logs",
   "sqlite": {
     "wal": true,
     "synchronous": "NORMAL",

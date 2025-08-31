@@ -25,6 +25,7 @@ import json
 import os
 import time
 import typing as T
+import logging
 
 try:  # robust sqlite import
     import sqlite3
@@ -38,6 +39,8 @@ except Exception:  # pragma: no cover
 import numpy as np
 import sqlite_vec
 from fastembed import TextEmbedding
+
+logger = logging.getLogger(__name__)
 
 
 def _iso_now() -> str:
@@ -73,6 +76,7 @@ DEFAULT_CONFIG = {
     # Use a concrete model string; fastembed expects a string, not None
     "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
     "search": {"top_k": 10, "score_round": 4},
+    "log_dir": ".",
     "sqlite": {
         "wal": True,
         "synchronous": "NORMAL",
@@ -133,6 +137,7 @@ class AgentVectorDB:
         c.commit()
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=2)
+        logger.info("Saved config overrides: %s", list(overrides.keys()))
         return {"ok": True, "config_path": self.config_path, "config": self.config}
 
     @staticmethod
@@ -140,9 +145,11 @@ class AgentVectorDB:
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(DEFAULT_CONFIG, f, indent=2)
+            logger.info("Created default config at %s", path)
             return json.loads(json.dumps(DEFAULT_CONFIG))
         with open(path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+        logger.info("Loaded config from %s", path)
 
         def deep_merge(default: dict, user: dict) -> dict:
             out = dict(default)
@@ -242,6 +249,7 @@ class AgentVectorDB:
 
     @_safe_json
     def reset_db(self, base_dir_abs: str) -> dict:
+        logger.info("Resetting database with base directory %s", base_dir_abs)
         c = self.conn
         c.executescript(
             """
@@ -264,6 +272,7 @@ class AgentVectorDB:
         self.config["base_dir"] = os.path.abspath(base_dir_abs)
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=2)
+        logger.info("Database reset complete; base_dir=%s", self.config["base_dir"])
         return {"ok": True, "message": "database reset", "base_dir": self.config["base_dir"]}
 
     @_safe_json
@@ -300,6 +309,7 @@ class AgentVectorDB:
         row = self.conn.execute("SELECT id FROM files WHERE path_rel=?", (path_rel,)).fetchone()
         if not row:
             raise RuntimeError("Failed to insert row.")
+        logger.info("Inserted path %s (existed=%s)", path_rel, existed)
         return {"ok": True, "id": int(row["id"]), "path_rel": path_rel, "existed": existed}
 
     @_safe_json
@@ -325,6 +335,7 @@ class AgentVectorDB:
             # Even if embedding fails we still want the report persisted.
             pass
         self.conn.commit()
+        logger.info("Saved file report for %s", path_rel)
         return {"ok": True, "id": file_id, "path_rel": path_rel}
 
     @_safe_json
@@ -349,6 +360,7 @@ class AgentVectorDB:
             (_iso_now(), *PROCESSING_SENTINELS),
         )
         self.conn.commit()
+        logger.info("Cleared %s processing file reports", cur.rowcount)
         return {"ok": True, "cleared": int(cur.rowcount)}
 
     @_safe_json
@@ -380,6 +392,7 @@ class AgentVectorDB:
             )
             updated.append(file_id)
         self.conn.commit()
+        logger.info("Appended organization notes to ids=%s", updated)
         return {"ok": True, "updated_ids": updated}
 
     @_safe_json
@@ -387,6 +400,7 @@ class AgentVectorDB:
         path_rel = _norm_rel(path_from_base)
         planned_dest = _norm_rel(planned_dest)
         self._update_one("planned_dest", path_rel, planned_dest)
+        logger.info("Set planned destination for %s -> %s", path_rel, planned_dest)
         return {"ok": True, "path_rel": path_rel, "planned_dest": planned_dest}
 
     @_safe_json
@@ -394,6 +408,7 @@ class AgentVectorDB:
         path_rel = _norm_rel(path_from_base)
         final_dest = _norm_rel(final_dest)
         self._update_one("final_dest", path_rel, final_dest)
+        logger.info("Set final destination for %s -> %s", path_rel, final_dest)
         return {"ok": True, "path_rel": path_rel, "final_dest": final_dest}
 
     def _update_one(self, col: str, path_rel: str, value: str) -> None:
