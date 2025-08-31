@@ -321,20 +321,32 @@ class AgentVectorDB:
         if not row:
             raise KeyError(f"path not found: {path_rel}")
         file_id = int(row["id"])
-        self.conn.execute(
-            "UPDATE files SET file_report=?, updated_at=? WHERE id=?",
-            (text, _iso_now(), file_id),
-        )
-        try:
-            emb = self._embed_doc(text)
-            self.conn.execute(
-                "INSERT OR REPLACE INTO vec_file_report(file_id, embedding, path_rel) VALUES(?,?,?)",
-                (file_id, emb, path_rel),
-            )
-        except Exception:  # pylint: disable=broad-except
-            # Even if embedding fails we still want the report persisted.
-            pass
-        self.conn.commit()
+
+        attempts = 0
+        while True:
+            try:
+                self.conn.execute(
+                    "UPDATE files SET file_report=?, updated_at=? WHERE id=?",
+                    (text, _iso_now(), file_id),
+                )
+                try:
+                    emb = self._embed_doc(text)
+                    self.conn.execute(
+                        "INSERT OR REPLACE INTO vec_file_report(file_id, embedding, path_rel) VALUES(?,?,?)",
+                        (file_id, emb, path_rel),
+                    )
+                except Exception:  # pylint: disable=broad-except
+                    # Even if embedding fails we still want the report persisted.
+                    pass
+                self.conn.commit()
+                break
+            except sqlite3.OperationalError as exc:  # pragma: no cover - rare
+                if "locked" in str(exc).lower() and attempts < 3:
+                    attempts += 1
+                    time.sleep(0.1 * attempts)
+                    continue
+                raise
+
         logger.info("Saved file report for %s", path_rel)
         return {"ok": True, "id": file_id, "path_rel": path_rel}
 
