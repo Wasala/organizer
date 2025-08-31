@@ -3,17 +3,25 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import Dict
+import logging
+from typing import Dict, Any, AsyncIterable
 
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import UsageLimits
+from pydantic_ai.messages import AgentStreamEvent
+from pydantic_ai.tools import RunContext
 
 from file_analysis_agent.agent_tools import tools
+from agent_utils import setup_logging
 
 CONFIG_PATH = Path(__file__).with_name("config.json")
 PROMPT_PATH = Path(__file__).with_name("prompt.md")
+ROOT_CONFIG = Path(__file__).resolve().parents[1] / "organizer.config.json"
+
+setup_logging(str(ROOT_CONFIG))
+logger = logging.getLogger(__name__)
 
 
 def load_config() -> Dict[str, str]:
@@ -33,6 +41,14 @@ def build_agent() -> Agent:
 
 
 agent = build_agent()
+
+
+async def _log_event_stream(
+    _: RunContext[Any], stream: AsyncIterable[AgentStreamEvent]
+) -> None:
+    """Log events emitted during agent execution."""
+    async for event in stream:
+        logger.info("agent event: %s", event)
 
 
 @agent.tool_plain
@@ -102,7 +118,13 @@ def ask_file_analysis_agent(
         The agent's textual response.
     """
     agent_query = f"{query} {path}"
-    response = agent.run_sync(agent_query, usage_limits=UsageLimits(request_limit=20))
+    logger.info("file_analysis_agent query: %s", agent_query)
+    response = agent.run_sync(
+        agent_query,
+        usage_limits=UsageLimits(request_limit=20),
+        event_stream_handler=_log_event_stream,
+    )
+    logger.info("file_analysis_agent response: %s", response.output)
     return response.output
 
 
