@@ -1,6 +1,10 @@
 from agent_utils.agent_vector_db import AgentVectorDB, PROCESSING_SENTINELS
 
 
+import sqlite3
+import threading
+
+
 class FakeEmbedder:
     def __init__(self, model_name=None):
         pass
@@ -106,6 +110,24 @@ def test_set_file_report_handles_embedding_failure(tmp_path, monkeypatch):
     db.insert("foo.txt")
 
     # Should still persist even though embedding fails
+    res = db.set_file_report("foo.txt", "hello")
+    assert res["ok"]
+    assert db.get_file_report("foo.txt")["file_report"] == "hello"
+
+
+def test_set_file_report_retries_on_locked(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "retry.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "b"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    db.insert("foo.txt")
+
+    other = sqlite3.connect(db.config["db_path"], check_same_thread=False)
+    other.execute("BEGIN EXCLUSIVE")
+    threading.Timer(0.2, other.commit).start()
+
     res = db.set_file_report("foo.txt", "hello")
     assert res["ok"]
     assert db.get_file_report("foo.txt")["file_report"] == "hello"
