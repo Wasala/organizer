@@ -39,7 +39,7 @@ def test_planner_tools(tmp_path, monkeypatch):
     (base / "a.txt").write_text("")
     (base / "b.txt").write_text("")
 
-    db.save_config(instructions="Keep PDFs in docs")
+    db.save_config(instructions="Keep PDFs in docs", target_dir=str(base))
 
     instr = planner_tools.get_folder_instructions()
     assert instr["instructions"] == "Keep PDFs in docs"
@@ -53,6 +53,6 @@ def test_planner_tools(tmp_path, monkeypatch):
     sim = planner_tools.find_similar_file_reports("a.txt")
     assert any(r["path_rel"] == "a.txt" for r in sim["results"])
 
-    tree = planner_tools.target_folder_tree(str(base))
+    tree = planner_tools.target_folder_tree()
     assert f"Folder Tree for {base}" in tree
     assert "a.txt" in tree and "b.txt" in tree

@@ -40,9 +40,19 @@ def get_folder_instructions() -> dict:
     return _db.get_instructions()
 
 
-def target_folder_tree(path: str) -> str:
-    """Return a folder tree for ``path`` with a heading."""
-    return _target_folder_tree(path)
+def target_folder_tree() -> str:
+    """Return a folder tree for the configured target directory.
+
+    Raises
+    ------
+    ValueError
+        If the ``target_dir`` configuration option has not been set.
+    """
+
+    target_dir = _db.config.get("target_dir")
+    if not target_dir:
+        raise ValueError("target_dir is not configured")
+    return _target_folder_tree(target_dir)
 
 
 def get_db() -> AgentVectorDB:

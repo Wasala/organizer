@@ -1,5 +1,4 @@
 import importlib
-import importlib
 import os
 
 from agent_utils.agent_vector_db import AgentVectorDB
@@ -38,7 +37,7 @@ def test_decider_tools(tmp_path, monkeypatch):
     (base / "a.txt").write_text("")
     (base / "b.txt").write_text("")
 
-    db.save_config(instructions="Keep PDFs in docs")
+    db.save_config(instructions="Keep PDFs in docs", target_dir=str(base))
 
     instr = decider_tools.get_folder_instructions()
     assert instr["instructions"] == "Keep PDFs in docs"
@@ -56,5 +55,5 @@ def test_decider_tools(tmp_path, monkeypatch):
     row = db.conn.execute("SELECT planned_dest FROM files WHERE path_rel='a.txt'").fetchone()
     assert row["planned_dest"] == "dest/a"
 
-    tree = decider_tools.target_folder_tree(str(base))
+    tree = decider_tools.target_folder_tree()
     assert "a.txt" in tree and "b.txt" in tree
