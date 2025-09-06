@@ -38,11 +38,13 @@ JSON‑friendly helper functions:
 - `append_organization_notes(ids, notes)` – add free‑form notes to one or more file
   ids.
 - `get_file_report(path)` – retrieve the stored report for `path`.
-- `target_folder_tree()` – render a textual folder tree rooted at the configured target directory.
+- `target_folder_tree()` – return a dictionary with the textual folder tree and
+  an optional list of traversal errors.
 
-These functions operate on a global `AgentVectorDB` instance and all results follow
+These functions operate on a global `AgentVectorDB` instance. Most results follow
 the pattern `{"ok": True, ...}` or contain an `"error"` field when something goes
-wrong.
+wrong. `target_folder_tree` instead provides a `{"tree": ..., "errors": [...]}`
+dictionary so that partial traversal issues can be reported.
 
 ## Pydantic agent
 

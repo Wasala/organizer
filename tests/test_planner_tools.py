@@ -54,5 +54,6 @@ def test_planner_tools(tmp_path, monkeypatch):
     assert any(r["path_rel"] == "a.txt" for r in sim["results"])
 
     tree = planner_tools.target_folder_tree()
-    assert f"Folder Tree for {base}" in tree
-    assert "a.txt" in tree and "b.txt" in tree
+    assert f"Folder Tree for {base}" in tree["tree"]
+    assert "a.txt" in tree["tree"] and "b.txt" in tree["tree"]
+    assert "errors" not in tree or not tree["errors"]
