@@ -1,12 +1,35 @@
 """PydanticAI agent exposing file organization planner tools."""
 from __future__ import annotations
 
+from pathlib import Path
+import json
+
 from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from .agent_tools import tools
 
+ROOT_CONFIG = Path(__file__).resolve().parents[1] / "organizer.config.json"
+
+
+def load_config() -> dict:
+    """Load configuration for the planner agent from the main config file."""
+    with ROOT_CONFIG.open(encoding="utf-8") as config_file:
+        cfg = json.load(config_file)
+    agent_cfg = cfg.get("file_organization_planner_agent", {})
+    agent_cfg.setdefault("api_key", cfg.get("api_key", ""))
+    return agent_cfg
+
+
+_CFG = load_config()
+_MODEL = OpenAIModel(
+    _CFG.get("model", "gpt-5-nano"),
+    provider=OpenAIProvider(api_key=_CFG.get("api_key")),
+)
+
 agent = Agent(
-    "google-gla:gemini-1.5-flash",
+    model=_MODEL,
     system_prompt=(
         "You are a file organization planning assistant. Use tools to search file reports,"
         " manage notes, and inspect folder structures."

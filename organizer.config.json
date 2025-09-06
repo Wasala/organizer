@@ -16,5 +16,20 @@
     "temp_store_memory": true
   },
   "recursive": true,
-  "dont_delete": true
+  "dont_delete": true,
+  "api_key": "",
+  "file_analysis_agent": {
+    "model": "gpt-5-nano",
+    "cache_dir": "~/.file_analysis_cache",
+    "max_return_chars": 5000,
+    "regex_default_flags": "im",
+    "token_limit": 4000,
+    "encoding_name": "cl100k_base",
+    "conversion_timeout": 45
+  },
+  "file_organization_planner_agent": {
+    "model": "gpt-5-nano",
+    "max_return_chars": 200000,
+    "token_limit": 100000
+  }
 }

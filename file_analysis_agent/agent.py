@@ -16,7 +16,6 @@ from pydantic_ai.tools import RunContext
 from file_analysis_agent.agent_tools import tools
 from agent_utils import setup_logging
 
-CONFIG_PATH = Path(__file__).with_name("config.json")
 PROMPT_PATH = Path(__file__).with_name("prompt.md")
 ROOT_CONFIG = Path(__file__).resolve().parents[1] / "organizer.config.json"
 
@@ -24,10 +23,13 @@ setup_logging(str(ROOT_CONFIG))
 logger = logging.getLogger(__name__)
 
 
-def load_config() -> Dict[str, str]:
-    """Load configuration for the agent."""
-    with CONFIG_PATH.open(encoding="utf-8") as config_file:
-        return json.load(config_file)
+def load_config() -> Dict[str, Any]:
+    """Load configuration for the agent from the main config file."""
+    with ROOT_CONFIG.open(encoding="utf-8") as config_file:
+        cfg = json.load(config_file)
+    agent_cfg = cfg.get("file_analysis_agent", {})
+    agent_cfg.setdefault("api_key", cfg.get("api_key", ""))
+    return agent_cfg
 
 
 def build_agent() -> Agent:

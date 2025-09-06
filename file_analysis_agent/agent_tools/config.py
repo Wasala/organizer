@@ -31,14 +31,14 @@ class AgentConfig(BaseModel):
     )
 
 
-CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.json"
+ROOT_CONFIG = Path(__file__).resolve().parents[2] / "organizer.config.json"
 
 
 def _load_config_from_file() -> AgentConfig:
-    """Load configuration from ``config.json`` if present."""
-    if CONFIG_FILE.exists():
-        data = json.loads(CONFIG_FILE.read_text())
-        cfg = AgentConfig(**data)
+    """Load configuration from the main config file if present."""
+    if ROOT_CONFIG.exists():
+        data = json.loads(ROOT_CONFIG.read_text())
+        cfg = AgentConfig(**data.get("file_analysis_agent", {}))
     else:
         cfg = AgentConfig()
     cfg.cache_dir = Path(cfg.cache_dir).expanduser()

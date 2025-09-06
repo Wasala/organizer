@@ -17,10 +17,12 @@ pip install -e .[docling]
 
 ## Configuration
 
-Default settings live in [`file_analysis_agent/config.json`](file_analysis_agent/config.json):
+Default settings live in the ``file_analysis_agent`` section of
+``organizer.config.json``:
 
 ```json
-{
+"file_analysis_agent": {
+  "model": "gpt-5-nano",
   "cache_dir": "~/.file_analysis_cache",
   "max_return_chars": 5000,
   "regex_default_flags": "im",
