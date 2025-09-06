@@ -57,7 +57,12 @@ def test_agent_vector_db(tmp_path, monkeypatch):
 
     notes_res = db.append_organization_notes([ins1["id"]], "note1")
     assert ins1["id"] in notes_res["updated_ids"]
-    assert db.get_organization_notes("file1.txt")["organization_notes"].startswith("note1")
+    notes_res = db.append_organization_notes([ins1["id"]], "note2")
+    assert ins1["id"] in notes_res["updated_ids"]
+    notes_lines = db.get_organization_notes("file1.txt")["organization_notes"].splitlines()
+    assert len(notes_lines) == 2
+    assert notes_lines[0].endswith("{Note: note1}")
+    assert notes_lines[1].endswith("{Note: note2}")
 
     db.set_planned_destination("file1.txt", "dest/a")
     db.set_final_destination("file1.txt", "final/a")

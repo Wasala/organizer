@@ -22,10 +22,11 @@ Configuration example (save as organizer.config.json):
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
+from datetime import datetime, timezone
 import typing as T
-import logging
 
 try:  # robust sqlite import
     import sqlite3
@@ -377,6 +378,21 @@ class AgentVectorDB:
 
     @_safe_json
     def append_organization_notes(self, ids: T.Iterable[int], notes_to_append: str) -> dict:
+        """Append timestamped organisation notes to the specified files.
+
+        Parameters
+        ----------
+        ids:
+            Iterable of file identifiers to update.
+        notes_to_append:
+            Note text to append.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing ``updated_ids``.
+        """
+
         ids = [int(i) for i in ids]
         if not ids:
             raise ValueError("No ids provided.")
@@ -384,22 +400,28 @@ class AgentVectorDB:
             raise ValueError("organization_notes to append is empty.")
         cur = self.conn.cursor()
         now = _iso_now()
-        updated = []
+        updated: list[int] = []
+        timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
+        note_line = f"[{timestamp}]{{Note: {notes_to_append.strip()}}}"
         for file_id in ids:
-            row = cur.execute("SELECT organization_notes, path_rel FROM files WHERE id=?", (file_id,)).fetchone()
+            row = cur.execute(
+                "SELECT organization_notes, path_rel FROM files WHERE id=?",
+                (file_id,),
+            ).fetchone()
             if not row:
                 continue
-            merged = (row["organization_notes"] or "")
+            merged = row["organization_notes"] or ""
             if merged and not merged.endswith("\n"):
                 merged += "\n"
-            merged += notes_to_append
+            merged += note_line
             cur.execute(
                 "UPDATE files SET organization_notes=?, updated_at=? WHERE id=?",
                 (merged, now, file_id),
             )
             emb = self._embed_doc(merged)
+            cur.execute("DELETE FROM vec_org_notes WHERE file_id=?", (file_id,))
             cur.execute(
-                "INSERT OR REPLACE INTO vec_org_notes(file_id, embedding, path_rel) VALUES(?, ?, ?)",
+                "INSERT INTO vec_org_notes(file_id, embedding, path_rel) VALUES(?, ?, ?)",
                 (file_id, emb, row["path_rel"]),
             )
             updated.append(file_id)
