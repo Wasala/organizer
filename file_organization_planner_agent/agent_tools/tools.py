@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from agent_utils.agent_vector_db import AgentVectorDB
-from agent_utils.folder_tree import target_folder_tree
+from agent_utils.folder_tree import target_folder_tree as _target_folder_tree
 
 _DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "organizer.config.json"
 _CONFIG_PATH = os.environ.get("FILE_ORGANIZER_CONFIG", str(_DEFAULT_CONFIG))
@@ -30,6 +30,21 @@ def get_file_report(path: str) -> dict:
 def get_folder_instructions() -> dict:
     """Retrieve user folder organization instructions."""
     return _db.get_instructions()
+
+
+def target_folder_tree() -> str:
+    """Return a folder tree for the configured target directory.
+
+    Raises
+    ------
+    ValueError
+        If the ``target_dir`` configuration option has not been set.
+    """
+
+    target_dir = _db.config.get("target_dir")
+    if not target_dir:
+        raise ValueError("target_dir is not configured")
+    return _target_folder_tree(target_dir)
 
 
 

@@ -85,9 +85,9 @@ def get_folder_instructions() -> dict:
 
 
 @agent.tool_plain
-def target_folder_tree(path: str) -> str:
-    """Return a folder tree for ``path`` with a heading."""
-    return tools.target_folder_tree(path)
+def target_folder_tree() -> str:
+    """Return a folder tree for the configured target directory."""
+    return tools.target_folder_tree()
 
 
 def ask_file_organization_decider_agent(

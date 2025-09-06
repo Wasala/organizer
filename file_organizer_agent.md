@@ -38,7 +38,7 @@ JSON‑friendly helper functions:
 - `append_organization_notes(ids, notes)` – add free‑form notes to one or more file
   ids.
 - `get_file_report(path)` – retrieve the stored report for `path`.
-- `target_folder_tree(path)` – render a textual folder tree rooted at `path`.
+- `target_folder_tree()` – render a textual folder tree rooted at the configured target directory.
 
 These functions operate on a global `AgentVectorDB` instance and all results follow
 the pattern `{"ok": True, ...}` or contain an `"error"` field when something goes
