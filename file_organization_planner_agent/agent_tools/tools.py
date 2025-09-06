@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Iterable
 
 from agent_utils.agent_vector_db import AgentVectorDB
 from agent_utils.folder_tree import target_folder_tree
 
-_CONFIG_PATH = os.environ.get("FILE_ORGANIZER_CONFIG", "organizer.config.json")
+_DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "organizer.config.json"
+_CONFIG_PATH = os.environ.get("FILE_ORGANIZER_CONFIG", str(_DEFAULT_CONFIG))
 
 # Global database instance used by the tools
 _db = AgentVectorDB(config_path=_CONFIG_PATH)
