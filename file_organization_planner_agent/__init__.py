@@ -1,5 +1,6 @@
 """File organization planner agent package."""
 
+from .agent import agent, ask_file_organization_planner_agent
 from .agent_tools import (
     append_organization_notes,
     find_similar_file_reports,
@@ -9,6 +10,8 @@ from .agent_tools import (
 )
 
 __all__ = [
+    "agent",
+    "ask_file_organization_planner_agent",
     "find_similar_file_reports",
     "append_organization_notes",
     "get_file_report",

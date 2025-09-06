@@ -3,17 +3,28 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import logging
+from typing import Any, AsyncIterable, Dict
 
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.usage import UsageLimits
+from pydantic_ai.messages import AgentStreamEvent
+from pydantic_ai.tools import RunContext
 
 from .agent_tools import tools
+from agent_utils import setup_logging
 
+
+PROMPT_PATH = Path(__file__).with_name("prompt.md")
 ROOT_CONFIG = Path(__file__).resolve().parents[1] / "organizer.config.json"
 
+setup_logging(str(ROOT_CONFIG))
+logger = logging.getLogger(__name__)
 
-def load_config() -> dict:
+
+def load_config() -> Dict[str, Any]:
     """Load configuration for the planner agent from the main config file."""
     with ROOT_CONFIG.open(encoding="utf-8") as config_file:
         cfg = json.load(config_file)
@@ -22,19 +33,25 @@ def load_config() -> dict:
     return agent_cfg
 
 
-_CFG = load_config()
-_MODEL = OpenAIModel(
-    _CFG.get("model", "gpt-5-nano"),
-    provider=OpenAIProvider(api_key=_CFG.get("api_key")),
-)
+def build_agent() -> Agent:
+    """Create an :class:`Agent` configured for planning organization."""
+    config = load_config()
+    api_key = config.get("api_key")
+    model_name = config.get("model", "gpt-5-nano")
+    system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
+    model = OpenAIModel(model_name, provider=OpenAIProvider(api_key=api_key))
+    return Agent(model=model, system_prompt=system_prompt, retries=2)
 
-agent = Agent(
-    model=_MODEL,
-    system_prompt=(
-        "You are a file organization planning assistant. Use tools to search file reports,"
-        " manage notes, and inspect folder structures."
-    ),
-)
+
+agent = build_agent()
+
+
+async def _log_event_stream(
+    _: RunContext[Any], stream: AsyncIterable[AgentStreamEvent]
+) -> None:
+    """Log events emitted during agent execution."""
+    async for event in stream:
+        logger.info("planner agent event: %s", event)
 
 
 @agent.tool_plain
@@ -65,3 +82,39 @@ def get_folder_instructions() -> dict:
 def target_folder_tree(path: str) -> str:
     """Return a folder tree for ``path`` with a heading."""
     return tools.target_folder_tree(path)
+
+
+def ask_file_organization_planner_agent(
+    path: str,
+    query: str = "Please plan the organization for file:",
+) -> str:
+    """Execute a query against the file organization planner agent.
+
+    Parameters
+    ----------
+    path:
+        Path to the file for which planning is requested.
+    query:
+        Prompt requesting the plan. ``path`` is appended to this string.
+
+    Returns
+    -------
+    str
+        The agent's textual response.
+    """
+
+    agent_query = f"{query} {path}"
+    logger.info("file_organization_planner_agent query: %s", agent_query)
+    response = agent.run_sync(
+        agent_query,
+        usage_limits=UsageLimits(request_limit=20),
+        event_stream_handler=_log_event_stream,
+    )
+    logger.info(
+        "file_organization_planner_agent response: %s", response.output
+    )
+    return response.output
+
+
+__all__ = ["ask_file_organization_planner_agent", "agent"]
+
