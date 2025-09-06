@@ -56,4 +56,5 @@ def test_decider_tools(tmp_path, monkeypatch):
     assert row["planned_dest"] == "dest/a"
 
     tree = decider_tools.target_folder_tree()
-    assert "a.txt" in tree and "b.txt" in tree
+    assert "a.txt" in tree["tree"] and "b.txt" in tree["tree"]
+    assert "errors" not in tree or not tree["errors"]

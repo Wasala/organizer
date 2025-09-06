@@ -40,8 +40,11 @@ def get_folder_instructions() -> dict:
     return _db.get_instructions()
 
 
-def target_folder_tree() -> str:
+def target_folder_tree() -> dict:
     """Return a folder tree for the configured target directory.
+
+    The returned dictionary mirrors :func:`agent_utils.folder_tree.target_folder_tree`
+    and may include an ``"errors"`` list if some paths could not be processed.
 
     Raises
     ------

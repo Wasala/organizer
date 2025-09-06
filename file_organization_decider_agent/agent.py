@@ -85,7 +85,7 @@ def get_folder_instructions() -> dict:
 
 
 @agent.tool_plain
-def target_folder_tree() -> str:
+def target_folder_tree() -> dict:
     """Return a folder tree for the configured target directory."""
     return tools.target_folder_tree()
 
