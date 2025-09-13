@@ -247,9 +247,10 @@ def _plan_pending_files(base_dir: str) -> None:
         path_rel = next_path.get("path_rel") if isinstance(next_path, dict) else None
         if not path_rel:
             break
-        abs_path = os.path.join(base_dir_abs, path_rel)
+        #db.append_organization_notes([<get id of the path_rel>], PROCESSING_SENTINELS[0]) <--
+        #abs_path = os.path.join(base_dir_abs, path_rel)
         runstate.status_text = f"Planning {path_rel}"
-        ask_file_organization_planner_agent(abs_path)
+        ask_file_organization_planner_agent(path_rel)
         db.mark_organization_plan_processed(path_rel)
 
 # ---------- Config ----------
