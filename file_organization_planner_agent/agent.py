@@ -55,9 +55,9 @@ async def _log_event_stream(
 
 
 @agent.tool_plain
-def find_similar_file_reports(path: str, top_k: int = 10) -> dict:
+def find_similar_file_reports(path: str) -> dict:
     """Find semantically similar file reports for ``path``."""
-    return tools.find_similar_file_reports(path, top_k=top_k)
+    return tools.find_similar_file_reports(path, top_k=10)
 
 
 @agent.tool_plain
@@ -113,6 +113,7 @@ def ask_file_organization_planner_agent(
     logger.info(
         "file_organization_planner_agent response: %s", response.output
     )
+    print(response)
     return response.output
 
 

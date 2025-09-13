@@ -14,7 +14,7 @@ _CONFIG_PATH = os.environ.get("FILE_ORGANIZER_CONFIG", str(_DEFAULT_CONFIG))
 # Global database instance used by the tools
 _db = AgentVectorDB(config_path=_CONFIG_PATH)
 
-def find_similar_file_reports(path: str, top_k: int = 10) -> dict:
+def find_similar_file_reports(path: str, top_k=10) -> dict:
     """Find semantically similar file reports for ``path``."""
     return _db.find_similar_file_reports(path, top_k=top_k)
 
