@@ -195,6 +195,7 @@ class AgentVectorDB:
               path_rel TEXT NOT NULL UNIQUE,
               file_report TEXT,
               organization_notes TEXT,
+              planner_processed INTEGER NOT NULL DEFAULT 0,
               planned_dest TEXT,
               final_dest TEXT,
               log TEXT,
@@ -207,6 +208,11 @@ class AgentVectorDB:
             );
             """
         )
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(files)")}
+        if "planner_processed" not in cols:
+            c.execute(
+                "ALTER TABLE files ADD COLUMN planner_processed INTEGER NOT NULL DEFAULT 0"
+            )
         exists_vec_fr = c.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_file_report'"
         ).fetchone()
@@ -469,12 +475,34 @@ class AgentVectorDB:
         return {"ok": True, "path_rel": row["path_rel"] if row else None}
 
     @_safe_json
-    def get_next_path_missing_organization_notes(self) -> dict:
+    def mark_organization_plan_processed(self, path_from_base: str) -> dict:
+        """Mark that the planner has processed ``path_from_base``.
+
+        Parameters
+        ----------
+        path_from_base:
+            File path relative to the base directory.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing the normalised ``path_rel``.
+        """
+
+        path_rel = _norm_rel(path_from_base)
+        self._update_one("planner_processed", path_rel, 1)
+        logger.info("Marked planner processed for %s", path_rel)
+        return {"ok": True, "path_rel": path_rel}
+
+    @_safe_json
+    def get_next_path_pending_organization_plan(self) -> dict:
+        """Return the next file whose planner step has not run."""
+
         row = self.conn.execute(
             """
             SELECT path_rel FROM files
             WHERE IFNULL(TRIM(file_report),'')<>''
-              AND IFNULL(TRIM(organization_notes),'')=''
+              AND planner_processed=0
             ORDER BY id ASC LIMIT 1
             """
         ).fetchone()
@@ -486,7 +514,7 @@ class AgentVectorDB:
             """
             SELECT path_rel FROM files
             WHERE IFNULL(TRIM(file_report),'')<>''
-              AND IFNULL(TRIM(organization_notes),'')<>''
+              AND planner_processed=1
               AND IFNULL(TRIM(planned_dest),'')=''
             ORDER BY id ASC LIMIT 1
             """

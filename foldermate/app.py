@@ -224,6 +224,34 @@ def _analyze_pending_files(base_dir: str) -> None:
         report = ask_file_analysis_agent(abs_path)
         db.set_file_report(path_rel, report)
 
+
+def _plan_pending_files(base_dir: str) -> None:
+    """Run the organization planner for all unprocessed files.
+
+    The database is queried for files that have a ``file_report`` but have
+    not yet been processed by the planner. Each file is handled by
+    :func:`file_organization_planner_agent.agent.ask_file_organization_planner_agent`
+    and then marked as processed via
+    :meth:`AgentVectorDB.mark_organization_plan_processed`.
+    Processing stops when no files remain or a cancellation is requested via
+    :data:`runstate.cancel_event`.
+    """
+
+    from file_organization_planner_agent.agent import (  # pylint: disable=import-outside-toplevel
+        ask_file_organization_planner_agent,
+    )
+
+    base_dir_abs = os.path.abspath(base_dir)
+    while not runstate.cancel_event.is_set():
+        next_path = db.get_next_path_pending_organization_plan()
+        path_rel = next_path.get("path_rel") if isinstance(next_path, dict) else None
+        if not path_rel:
+            break
+        abs_path = os.path.join(base_dir_abs, path_rel)
+        runstate.status_text = f"Planning {path_rel}"
+        ask_file_organization_planner_agent(abs_path)
+        db.mark_organization_plan_processed(path_rel)
+
 # ---------- Config ----------
 @app.get("/api/config", response_model=ConfigOut)
 def get_config():
@@ -341,6 +369,29 @@ def start_action(
                 runstate.status_text = "Idle"
 
         threading.Thread(target=worker, daemon=True).start()
+        return status()
+
+    if action == "plan":
+        try:
+            base_info = db.get_base_dir()
+        except Exception as exc:  # pragma: no cover - defensive
+            runstate.stop()
+            raise HTTPException(status_code=400, detail="base_dir not set") from exc
+
+        def plan_worker() -> None:
+            """Run planning in a background thread.
+
+            Processes files awaiting organisation planning and ensures the
+            run state is cleared once finished or if an error occurs.
+            """
+
+            try:
+                _plan_pending_files(base_info["base_dir"])
+            finally:
+                runstate.stop()
+                runstate.status_text = "Idle"
+
+        threading.Thread(target=plan_worker, daemon=True).start()
         return status()
 
     return status()
