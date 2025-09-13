@@ -320,6 +320,32 @@ class AgentVectorDB:
         return {"ok": True, "id": int(row["id"]), "path_rel": path_rel, "existed": existed}
 
     @_safe_json
+    def get_file_id(self, path_from_base: str) -> dict:
+        """Return the database identifier for ``path_from_base``.
+
+        Parameters
+        ----------
+        path_from_base:
+            File path relative to the base directory.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing ``id`` and ``path_rel``.
+
+        Raises
+        ------
+        KeyError
+            If the path is not present in the database.
+        """
+
+        path_rel = _norm_rel(path_from_base)
+        row = self.conn.execute("SELECT id FROM files WHERE path_rel=?", (path_rel,)).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {path_rel}")
+        return {"ok": True, "id": int(row["id"]), "path_rel": path_rel}
+
+    @_safe_json
     def set_file_report(self, path_from_base: str, text: str) -> dict:
         if not text or not text.strip():
             raise ValueError("file_report text is empty.")

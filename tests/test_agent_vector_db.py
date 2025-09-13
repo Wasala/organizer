@@ -140,3 +140,18 @@ def test_set_file_report_retries_on_locked(tmp_path, monkeypatch):
     res = db.set_file_report("foo.txt", "hello")
     assert res["ok"]
     assert db.get_file_report("foo.txt")["file_report"] == "hello"
+
+
+def test_get_file_id(tmp_path, monkeypatch):
+    """Ensure file identifiers can be retrieved without modifying rows."""
+
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "id.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "b"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+
+    inserted = db.insert("foo.txt")
+    res = db.get_file_id("foo.txt")
+    assert res["id"] == inserted["id"]
