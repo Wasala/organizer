@@ -225,7 +225,7 @@ def _analyze_pending_files(base_dir: str) -> None:
         db.set_file_report(path_rel, report)
 
 
-def _plan_pending_files(base_dir: str) -> None:
+def _plan_pending_files(_base_dir: str) -> None:
     """Run the organization planner for all unprocessed files.
 
     The database is queried for files that have a ``file_report`` but have
@@ -241,14 +241,15 @@ def _plan_pending_files(base_dir: str) -> None:
         ask_file_organization_planner_agent,
     )
 
-    base_dir_abs = os.path.abspath(base_dir)
     while not runstate.cancel_event.is_set():
         next_path = db.get_next_path_pending_organization_plan()
         path_rel = next_path.get("path_rel") if isinstance(next_path, dict) else None
         if not path_rel:
             break
-        #db.append_organization_notes([<get id of the path_rel>], PROCESSING_SENTINELS[0]) <--
-        #abs_path = os.path.join(base_dir_abs, path_rel)
+        file_id_res = db.get_file_id(path_rel)
+        file_id = file_id_res.get("id") if isinstance(file_id_res, dict) else None
+        if file_id is not None:
+            db.append_organization_notes([file_id], PROCESSING_SENTINELS[0])
         runstate.status_text = f"Planning {path_rel}"
         ask_file_organization_planner_agent(path_rel)
         db.mark_organization_plan_processed(path_rel)
