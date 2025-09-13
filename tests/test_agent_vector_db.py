@@ -71,13 +71,17 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     ins3 = db.insert("file3.txt")
     db.set_file_report("file3.txt", "hello world again")
     db.append_organization_notes([ins3["id"]], "note3")
+    db.mark_organization_plan_processed("file1.txt")
+    db.mark_organization_plan_processed("file3.txt")
 
     # next path helpers
     assert db.get_next_path_missing_file_report()["path_rel"] is None
-    assert db.get_next_path_missing_organization_notes()["path_rel"] == "file2.txt"
+    assert db.get_next_path_pending_organization_plan()["path_rel"] == "file2.txt"
     assert db.get_next_path_missing_planned_destination()["path_rel"] == "file3.txt"
     db.set_planned_destination("file3.txt", "dest/c")
     assert db.get_next_path_missing_final_destination()["path_rel"] == "file3.txt"
+    db.mark_organization_plan_processed("file2.txt")
+    assert db.get_next_path_pending_organization_plan()["path_rel"] is None
 
     # similarity search
     sim = db.find_similar_file_reports("file1.txt", top_k=2)
