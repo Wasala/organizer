@@ -47,8 +47,11 @@ def test_planner_tools(tmp_path, monkeypatch):
     rep = planner_tools.get_file_report("a.txt")
     assert rep["file_report"] == "hello world"
 
-    notes = planner_tools.append_organization_notes([ins1["id"]], "note1")
+    notes = planner_tools.append_organization_cluser_notes([ins1["id"]], "note1")
     assert ins1["id"] in notes["updated_ids"]
+
+    anchor = planner_tools.append_organization_anchor_notes("a.txt", "anchor")
+    assert anchor["ok"]
 
     sim = planner_tools.find_similar_file_reports("a.txt")
     assert any(r["path_rel"] == "a.txt" for r in sim["results"])

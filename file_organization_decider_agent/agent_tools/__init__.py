@@ -6,7 +6,7 @@ level provides a compact API for other modules.
 """
 
 from .tools import (
-    append_organization_notes,
+    append_organization_cluser_notes,
     get_file_report,
     set_planned_destination,
     get_organization_notes,
@@ -15,7 +15,7 @@ from .tools import (
 )
 
 __all__ = [
-    "append_organization_notes",
+    "append_organization_cluser_notes",
     "get_file_report",
     "set_planned_destination",
     "get_organization_notes",

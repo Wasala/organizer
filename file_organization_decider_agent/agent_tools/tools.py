@@ -15,9 +15,9 @@ _CONFIG_PATH = os.environ.get("FILE_ORGANIZER_CONFIG", str(_DEFAULT_CONFIG))
 _db = AgentVectorDB(config_path=_CONFIG_PATH)
 
 
-def append_organization_notes(ids: Iterable[int], notes: str) -> dict:
+def append_organization_cluser_notes(ids: Iterable[int], notes: str) -> dict:
     """Append organization notes for the given file ``ids``."""
-    return _db.append_organization_notes(ids, notes)
+    return _db.append_organization_cluser_notes(ids, notes)
 
 
 def get_file_report(path: str) -> dict:

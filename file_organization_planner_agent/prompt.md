@@ -26,13 +26,13 @@ Call `target_folder_tree()` to fetch the configured target directory’s tree (s
 Call `find_similar_file_reports(path=ANCHOR_FILE_PATH)` to identify **semantically similar** files. Form clusters based on dominant tags (project > event > person/child > topic > type). Observe results where semantic similarity is also shown for top results. Pay attention to organization notes of similar files.
 
 **Step 5 — Cluster-level notes**
-For each cluster where files should be stored under the same hierarchy, call `append_organization_notes(ids=[...], notes="<ClusterNotes JSON>")`. Prefer **existing folders**; propose **one minimal new folder** only if none fits.
+For each cluster where files should be stored under the same hierarchy, call `append_organization_cluser_notes(ids=[...], notes="<ClusterNotes JSON>")`. Prefer **existing folders**; propose **one minimal new folder** only if none fits.
 
 **Step 6 — Destination selection (ties & ambiguity)**
 If multiple destinations are plausible, choose by precedence (see Constraints). Flag weak evidence for human review in the note.
 
 **Step 7 — Anchor-specific notes**
-Call `append_organization_notes(ids=[ANCHOR_ID], notes="<AnchorNotes JSON>")` including:
+Call `append_organization_anchor_notes(path=ANCHOR_FILE_PATH, notes="<AnchorNotes JSON>")` including:
 
 * **ProposedFolderPath** (reuse existing where possible)
 * **ProposedFilename** (date + project/org + doctype + topic/ID + version)
@@ -60,8 +60,10 @@ Call tools with JSON inputs. Prefer targeted calls.
 * `find_similar_file_reports(path: str) -> dict`
   Top 10 semantically similar file reports (ids/paths/tags/rationales).
 
-* `append_organization_notes(ids: Iterable[int], notes: str) -> dict`
-  Append **the same JSON note string** to every file id in `ids`. Use separate calls for cluster vs anchor.
+* `append_organization_cluser_notes(ids: Iterable[int], notes: str) -> dict`
+  Append **the same JSON note string** to every file id in `ids` for cluster-level notes.
+* `append_organization_anchor_notes(path: str, notes: str) -> dict`
+  Append notes for the anchor file identified by `path`.
 
 ---
 
@@ -78,7 +80,7 @@ Call tools with JSON inputs. Prefer targeted calls.
 ---
 
 ## Organization Notes — Required JSON Schemas
-Step 1 - call append_organization_notes([list of applicable IDs], "cluster notes") first
+Step 1 - call append_organization_cluser_notes([list of applicable IDs], "cluster notes") first
 ### A) ClusterNotes (attach to **all similar files** in the cluster that should be placed in the same proposed folder)
 Based on your analysis, identify paths of files (ProposedFilesForFolder), that can be included in the same folder (ProposedFolderPath) based on topic, theme, project and so on.
 Remember to add notes to all applicable files based on IDs.
@@ -99,7 +101,7 @@ Remember to add notes to all applicable files based on IDs.
   "NamingGuidance": { "FolderHint": "Projects/{ProjectName}/Design" }
 }
 ```
-Step 2 - call append_organization_notes([id of the current file under analysis], "anchor notes") again
+Step 2 - call append_organization_anchor_notes(path of the current file under analysis, "anchor notes")
 
 ### B) AnchorNotes (attach to **the anchor file only**)
 
@@ -153,12 +155,12 @@ Observations:
 ```
 Thought: Dominant tag = project: Alpha → reuse /Projects/Alpha/Design.
 Actions:
-- Action: append_organization_notes
+- Action: append_organization_cluser_notes
   Action Input: {
     "ids":[1293,4412,4510],
     "notes":"{\"Kind\":\"ClusterNotes\",\"ProposedFolderPath\":\"/Projects/Alpha/Design\",...}"
   }
-- Action: append_organization_notes
+- Action: append_organization_anchor_notes
   Action Input: {
     "ids":[1293],
     "notes":"{\"Kind\":\"AnchorNotes\",\"ProposedFolderPath\":\"/Projects/Alpha/Design\",\"ProposedFilename\":\"2025-03-14_Alpha_Design_Homepage_v02.pdf\",...}"
@@ -174,8 +176,8 @@ Observations:
 
 ## Output Rules
 
-* **Do not** produce any report or summary; your only deliverable is **appended notes** via `append_organization_notes`.
+* **Do not** produce any report or summary; your only deliverable is **appended notes** via `append_organization_cluser_notes` and `append_organization_anchor_notes`.
 * **Do not** move or rename files yourself.
 * Iterate tool calls until you can append **useful ClusterNotes** (for similar files) and **AnchorNotes** (for the anchor).
 * If evidence is missing, still append notes but include **low Confidence** and set **ReviewNeeded=true** with a clear rationale.
-* For each file given to you, append both cluter notes and anchor notes as two seperate calls to the tool append_organization_notes given to you
+* For each file given to you, append both cluster notes and anchor notes using the respective tools.

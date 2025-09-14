@@ -499,7 +499,7 @@ def put_file_report(file_id: int, payload: FileReportUpdate):
 
 @app.post("/api/files/notes/append", response_model=Dict[str, Any])
 def append_notes(payload: NotesAppend):
-    return db.append_organization_notes(payload.ids, payload.text)
+    return db.append_organization_cluser_notes(payload.ids, payload.text)
 
 # ---------- Similarity ----------
 @app.get("/api/files/{file_id}/similar", response_model=SimilarOut)

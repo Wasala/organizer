@@ -61,9 +61,15 @@ def find_similar_file_reports(path: str) -> dict:
 
 
 @agent.tool_plain
-def append_organization_notes(ids: list[int], notes: str) -> dict:
+def append_organization_cluser_notes(ids: list[int], notes: str) -> dict:
     """Append organization notes to the given file ``ids``."""
-    return tools.append_organization_notes(ids, notes)
+    return tools.append_organization_cluser_notes(ids, notes)
+
+
+@agent.tool_plain
+def append_organization_anchor_notes(path: str, notes: str) -> dict:
+    """Append organization notes for the file at ``path``."""
+    return tools.append_organization_anchor_notes(path, notes)
 
 
 @agent.tool_plain

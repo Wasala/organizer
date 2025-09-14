@@ -35,8 +35,10 @@ JSON‑friendly helper functions:
 
 - `find_similar_file_reports(path, top_k=10)` – return file reports whose embeddings
   are close to `path`.
-- `append_organization_notes(ids, notes)` – add free‑form notes to one or more file
-  ids.
+- `append_organization_cluser_notes(ids, notes)` – add free‑form notes to one or
+  more file ids.
+- `append_organization_anchor_notes(path, notes)` – add notes to a single file
+  identified by its path.
 - `get_file_report(path)` – retrieve the stored report for `path`.
 - `target_folder_tree()` – return a dictionary with the textual folder tree and
   an optional list of traversal errors.
