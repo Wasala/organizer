@@ -35,6 +35,37 @@ def get_organization_notes(path: str) -> dict:
     return _db.get_organization_notes(path)
 
 
+def get_planned_destination_folders(proposed_folder_path: str) -> str:
+    """Report existing planned destinations for a proposed folder path.
+
+    Parameters
+    ----------
+    proposed_folder_path:
+        The ``ProposedFolderPath`` value to look up within cluster notes.
+
+    Returns
+    -------
+    str
+        Summary of unique destination folders already decided for the
+        ``proposed_folder_path``.
+    """
+
+    res = _db.planned_destination_folders_for_proposed(proposed_folder_path)
+    if not res.get("ok"):
+        return str(res)
+    folders: list[str] = res.get("folders", [])
+    if not folders:
+        return (
+            f"For proposed {proposed_folder_path}, no existing destination paths have been found"
+        )
+    folder_lines = "\n".join(folders)
+    header = (
+        f"For proposed {proposed_folder_path}, "
+        "found following destination paths already decided:\n\n"
+    )
+    return f"{header}{folder_lines}"
+
+
 def get_folder_instructions() -> dict:
     """Retrieve user folder organization instructions."""
     return _db.get_instructions()

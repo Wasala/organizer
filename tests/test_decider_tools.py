@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 
 from agent_utils.agent_vector_db import AgentVectorDB
@@ -58,3 +59,24 @@ def test_decider_tools(tmp_path, monkeypatch):
     tree = decider_tools.target_folder_tree()
     assert "a.txt" in tree["tree"] and "b.txt" in tree["tree"]
     assert "errors" not in tree or not tree["errors"]
+
+    # cluster notes and planned destination folder lookups
+    cluster_json = json.dumps(
+        {"Kind": "ClusterNotes", "ProposedFolderPath": "/Personal/Health/Laya_OutpatientClaims"}
+    )
+    decider_tools.append_organization_cluser_notes([ins1["id"]], cluster_json)
+    decider_tools.append_organization_cluser_notes([ins2["id"]], cluster_json)
+    decider_tools.set_planned_destination(
+        "a.txt", str(base / "Personal/Health/Laya_OutpatientClaims/a.txt")
+    )
+    decider_tools.set_planned_destination(
+        "b.txt", str(base / "Personal/Health/InsuranceClaims/b.txt")
+    )
+
+    res = decider_tools.get_planned_destination_folders(
+        "/Personal/Health/Laya_OutpatientClaims"
+    )
+    assert "/Personal/Health/Laya_OutpatientClaims" in res
+    assert "/Personal/Health/InsuranceClaims" in res
+    empty = decider_tools.get_planned_destination_folders("/Nonexistent")
+    assert "no existing destination" in empty.lower()

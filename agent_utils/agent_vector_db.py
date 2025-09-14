@@ -715,6 +715,58 @@ class AgentVectorDB:
         }
 
     @_safe_json
+    def planned_destination_folders_for_proposed(
+        self, proposed_folder_path: str
+    ) -> dict:
+        """Return planned destination folders for a proposed folder path.
+
+        Parameters
+        ----------
+        proposed_folder_path:
+            Folder path as it appears in ``ProposedFolderPath`` within
+            cluster notes. Matching is case-insensitive.
+
+        Returns
+        -------
+        dict
+            Result containing a unique list of destination folders under the
+            ``folders`` key.
+        """
+
+        path_norm = _norm_rel(proposed_folder_path).lower()
+        if not path_norm:
+            return {"ok": True, "folders": []}
+
+        query = (
+            """
+            SELECT planned_dest FROM files
+            WHERE IFNULL(TRIM(planned_dest),'')<>''
+              AND LOWER(organization_notes) LIKE :path_match
+              AND LOWER(organization_notes) LIKE '%"kind"%"clusternotes"%'
+            """
+        )
+        rows = self.conn.execute(
+            query, {"path_match": f'%"proposedfolderpath"%"{path_norm}"%'}
+        ).fetchall()
+
+        target_dir = _norm_rel(self.config.get("target_dir", ""))
+        folders: set[str] = set()
+        for row in rows:
+            dest = row["planned_dest"]
+            if not dest:
+                continue
+            dest_norm = _norm_rel(dest)
+            if target_dir and dest_norm.lower().startswith(target_dir.lower()):
+                dest_norm = dest_norm[len(target_dir) :].lstrip("/\\")
+            folder = os.path.dirname(dest_norm).replace("\\", "/")
+            if folder and not folder.startswith("/"):
+                folder = "/" + folder
+            if folder:
+                folders.add(folder)
+
+        return {"ok": True, "folders": sorted(folders)}
+
+    @_safe_json
     def find_similar_file_reports(self, path_from_base: str, top_k: int | None = None) -> dict:
         path_rel = _norm_rel(path_from_base)
         row = self.conn.execute("SELECT id, file_report FROM files WHERE path_rel=?", (path_rel,)).fetchone()

@@ -1,6 +1,7 @@
 from agent_utils.agent_vector_db import AgentVectorDB, PROCESSING_SENTINELS
 
 
+import json
 import sqlite3
 import threading
 
@@ -177,3 +178,34 @@ def test_get_file_id(tmp_path, monkeypatch):
     inserted = db.insert("foo.txt")
     res = db.get_file_id("foo.txt")
     assert res["id"] == inserted["id"]
+
+
+def test_planned_destination_folders_for_proposed(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "plan.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    db.save_config(target_dir=str(base_dir))
+
+    ins1 = db.insert("a.txt")
+    ins2 = db.insert("b.txt")
+
+    cluster_json = json.dumps(
+        {"Kind": "ClusterNotes", "ProposedFolderPath": "/Personal/Health/Laya_OutpatientClaims"}
+    )
+    db.append_organization_cluser_notes([ins1["id"]], cluster_json)
+    db.append_organization_cluser_notes([ins2["id"]], cluster_json)
+    db.set_planned_destination(
+        "a.txt", str(base_dir / "Personal/Health/Laya_OutpatientClaims/a.txt")
+    )
+    db.set_planned_destination(
+        "b.txt", str(base_dir / "Personal/Health/InsuranceClaims/b.txt")
+    )
+
+    res = db.planned_destination_folders_for_proposed(
+        "/Personal/Health/Laya_OutpatientClaims"
+    )
+    assert "/Personal/Health/Laya_OutpatientClaims" in res["folders"]
+    assert "/Personal/Health/InsuranceClaims" in res["folders"]

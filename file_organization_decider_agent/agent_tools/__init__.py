@@ -10,6 +10,7 @@ from .tools import (
     get_file_report,
     set_planned_destination,
     get_organization_notes,
+    get_planned_destination_folders,
     get_folder_instructions,
     target_folder_tree,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "get_file_report",
     "set_planned_destination",
     "get_organization_notes",
+    "get_planned_destination_folders",
     "get_folder_instructions",
     "target_folder_tree",
 ]

@@ -13,8 +13,8 @@ from pydantic_ai.usage import UsageLimits
 from pydantic_ai.messages import AgentStreamEvent
 from pydantic_ai.tools import RunContext
 
-from .agent_tools import tools
 from agent_utils import setup_logging
+from .agent_tools import tools
 
 
 PROMPT_PATH = Path(__file__).with_name("prompt.md")
@@ -79,6 +79,12 @@ def get_organization_notes(path: str) -> dict:
 
 
 @agent.tool_plain
+def get_planned_destination_folders(proposed_folder_path: str) -> str:
+    """Report planned destinations for a ``ProposedFolderPath`` value."""
+    return tools.get_planned_destination_folders(proposed_folder_path)
+
+
+@agent.tool_plain
 def get_folder_instructions() -> dict:
     """Return user folder organization instructions."""
     return tools.get_folder_instructions()
@@ -123,4 +129,3 @@ def ask_file_organization_decider_agent(
 
 
 __all__ = ["ask_file_organization_decider_agent", "agent"]
-
