@@ -42,7 +42,9 @@ db.insert('notes/todo.txt')
 db.set_file_report('notes/todo.txt', 'text from an OCR or manual summary')
 
 # Add personal organisation notes (stored as `[dd-mm-yy-hh:mm:ss]...`)
-db.append_organization_notes([1], 'Remember to move this to /archive')
+db.append_organization_cluser_notes([1], 'Remember to move this to /archive')
+# Add a note for a single file using its path
+db.append_organization_anchor_notes('notes/todo.txt', 'rename to todo_2025')
 
 # Find similar reports using vector search
 similar = db.find_similar_file_reports('notes/todo.txt')
@@ -61,7 +63,8 @@ parameters for the search engine.  You can edit this JSON file directly or call
 | `reset_db(base_dir_abs)` | Create a fresh database and remember the absolute base directory. |
 | `insert(path_from_base)` | Register a file path relative to the base directory. |
 | `set_file_report(path, text)` | Store a block of descriptive text and index it for similarity search. |
-| `append_organization_notes(ids, notes)` | Add timestamped notes for one or more file ids. |
+| `append_organization_cluser_notes(ids, notes)` | Add timestamped notes for one or more file ids. |
+| `append_organization_anchor_notes(path, notes)` | Add timestamped notes for a single file path. |
 | `set_planned_destination(path, dest)` / `set_final_destination(path, dest)` | Track where a file should go or ended up. |
 | `find_similar_file_reports(path, top_k)` | Return paths with reports similar to the given file. |
 | `get_next_path_missing_*()` | Helper methods that return the next file path lacking a particular field. |

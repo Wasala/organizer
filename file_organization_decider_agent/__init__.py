@@ -2,7 +2,7 @@
 
 from .agent import agent, ask_file_organization_decider_agent
 from .agent_tools import (
-    append_organization_notes,
+    append_organization_cluser_notes,
     get_file_report,
     set_planned_destination,
     get_organization_notes,
@@ -13,7 +13,7 @@ from .agent_tools import (
 __all__ = [
     "agent",
     "ask_file_organization_decider_agent",
-    "append_organization_notes",
+    "append_organization_cluser_notes",
     "get_file_report",
     "set_planned_destination",
     "get_organization_notes",

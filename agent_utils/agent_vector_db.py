@@ -409,7 +409,9 @@ class AgentVectorDB:
         return {"ok": True, "cleared": int(cur.rowcount)}
 
     @_safe_json
-    def append_organization_notes(self, ids: T.Iterable[int], notes_to_append: str) -> dict:
+    def append_organization_cluser_notes(
+        self, ids: T.Iterable[int], notes_to_append: str
+    ) -> dict:
         """Append timestamped organisation notes to the specified files.
 
         Parameters
@@ -460,6 +462,34 @@ class AgentVectorDB:
         self.conn.commit()
         logger.info("Appended organization notes to ids=%s", updated)
         return {"ok": True, "updated_ids": updated}
+
+    @_safe_json
+    def append_organization_anchor_notes(
+        self, path_rel: str, notes_to_append: str
+    ) -> dict:
+        """Append timestamped organisation notes for a single file by path.
+
+        Parameters
+        ----------
+        path_rel:
+            File path relative to the base directory.
+        notes_to_append:
+            Note text to append.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing ``updated_ids`` with the single
+            updated file id.
+        """
+
+        norm = _norm_rel(path_rel)
+        row = self.conn.execute(
+            "SELECT id FROM files WHERE path_rel=?", (norm,)
+        ).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {norm}")
+        return self.append_organization_cluser_notes([int(row["id"])], notes_to_append)
 
     @_safe_json
     def prepend_organization_note_sentinel(

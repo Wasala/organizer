@@ -52,17 +52,21 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     ins2 = db.insert("file2.txt")
     db.set_file_report("file1.txt", "hello world")
     db.set_file_report("file2.txt", "hello there")
+    db.append_organization_anchor_notes("file2.txt", "anchor")
 
     assert db.get_file_report("file1.txt")["file_report"] == "hello world"
 
-    notes_res = db.append_organization_notes([ins1["id"]], "note1")
+    notes_res = db.append_organization_cluser_notes([ins1["id"]], "note1")
     assert ins1["id"] in notes_res["updated_ids"]
-    notes_res = db.append_organization_notes([ins1["id"]], "note2")
+    notes_res = db.append_organization_cluser_notes([ins1["id"]], "note2")
     assert ins1["id"] in notes_res["updated_ids"]
     notes_lines = db.get_organization_notes("file1.txt")["organization_notes"].splitlines()
     assert len(notes_lines) == 2
     assert notes_lines[0].endswith("note1")
     assert notes_lines[1].endswith("note2")
+
+    anchor_lines = db.get_organization_notes("file2.txt")["organization_notes"].splitlines()
+    assert any(line.endswith("anchor") for line in anchor_lines)
 
     db.set_planned_destination("file1.txt", "dest/a")
     db.set_final_destination("file1.txt", "final/a")
@@ -70,7 +74,7 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     # Insert third file for planned/final tests
     ins3 = db.insert("file3.txt")
     db.set_file_report("file3.txt", "hello world again")
-    db.append_organization_notes([ins3["id"]], "note3")
+    db.append_organization_cluser_notes([ins3["id"]], "note3")
     db.mark_organization_plan_processed("file1.txt")
     db.mark_organization_plan_processed("file3.txt")
 
@@ -117,7 +121,7 @@ def test_prepend_and_remove_sentinel(tmp_path, monkeypatch):
     base_dir.mkdir()
     db.reset_db(str(base_dir))
     inserted = db.insert("note.txt")
-    db.append_organization_notes([inserted["id"]], "note1")
+    db.append_organization_cluser_notes([inserted["id"]], "note1")
     db.prepend_organization_note_sentinel("note.txt", PROCESSING_SENTINELS[0])
     notes = db.get_organization_notes("note.txt")["organization_notes"].splitlines()
     assert notes[0] == PROCESSING_SENTINELS[0]

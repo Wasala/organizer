@@ -55,9 +55,9 @@ async def _log_event_stream(
 
 
 @agent.tool_plain
-def append_organization_notes(ids: list[int], notes: str) -> dict:
+def append_organization_cluser_notes(ids: list[int], notes: str) -> dict:
     """Append organization notes to the given file ``ids``."""
-    return tools.append_organization_notes(ids, notes)
+    return tools.append_organization_cluser_notes(ids, notes)
 
 
 @agent.tool_plain

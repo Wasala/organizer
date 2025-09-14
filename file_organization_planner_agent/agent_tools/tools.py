@@ -18,9 +18,14 @@ def find_similar_file_reports(path: str, top_k=10) -> dict:
     """Find semantically similar file reports for ``path``."""
     return _db.find_similar_file_reports(path, top_k=top_k)
 
-def append_organization_notes(ids: Iterable[int], notes: str) -> dict:
+def append_organization_cluser_notes(ids: Iterable[int], notes: str) -> dict:
     """Append organization notes for the given file ``ids``."""
-    return _db.append_organization_notes(ids, notes)
+    return _db.append_organization_cluser_notes(ids, notes)
+
+
+def append_organization_anchor_notes(path: str, notes: str) -> dict:
+    """Append organization notes for a single file specified by ``path``."""
+    return _db.append_organization_anchor_notes(path, notes)
 
 def get_file_report(path: str) -> dict:
     """Retrieve the stored file report for ``path``."""
