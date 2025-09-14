@@ -109,6 +109,24 @@ def test_clear_processing_file_reports(tmp_path, monkeypatch):
     assert db.get_next_path_missing_file_report()["path_rel"] == "foo.txt"
 
 
+def test_prepend_and_remove_sentinel(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "sent.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    inserted = db.insert("note.txt")
+    db.append_organization_notes([inserted["id"]], "note1")
+    db.prepend_organization_note_sentinel("note.txt", PROCESSING_SENTINELS[0])
+    notes = db.get_organization_notes("note.txt")["organization_notes"].splitlines()
+    assert notes[1] == PROCESSING_SENTINELS[0]
+    db.remove_organization_note_sentinel("note.txt", PROCESSING_SENTINELS[0])
+    remaining = db.get_organization_notes("note.txt")["organization_notes"].splitlines()
+    assert PROCESSING_SENTINELS[0] not in remaining
+    assert any("note1" in line for line in remaining)
+
+
 def test_set_file_report_handles_embedding_failure(tmp_path, monkeypatch):
     monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FailingEmbedder)
     config_path = tmp_path / "f.cfg"

@@ -246,12 +246,10 @@ def _plan_pending_files(_base_dir: str) -> None:
         path_rel = next_path.get("path_rel") if isinstance(next_path, dict) else None
         if not path_rel:
             break
-        file_id_res = db.get_file_id(path_rel)
-        file_id = file_id_res.get("id") if isinstance(file_id_res, dict) else None
-        if file_id is not None:
-            db.append_organization_notes([file_id], PROCESSING_SENTINELS[0])
+        db.prepend_organization_note_sentinel(path_rel, PROCESSING_SENTINELS[0])
         runstate.status_text = f"Planning {path_rel}"
         ask_file_organization_planner_agent(path_rel)
+        db.remove_organization_note_sentinel(path_rel, PROCESSING_SENTINELS[0])
         db.mark_organization_plan_processed(path_rel)
 
 # ---------- Config ----------
