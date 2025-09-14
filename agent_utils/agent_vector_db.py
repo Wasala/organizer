@@ -434,7 +434,7 @@ class AgentVectorDB:
         now = _iso_now()
         updated: list[int] = []
         timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
-        note_line = f"[{timestamp}]{{Note: {notes_to_append.strip()}}}"
+        note_line = f"[{timestamp}]\n{notes_to_append.strip()}\n"
         for file_id in ids:
             row = cur.execute(
                 "SELECT organization_notes, path_rel FROM files WHERE id=?",
