@@ -41,7 +41,7 @@ db.insert('notes/todo.txt')
 # Attach a short report about the file
 db.set_file_report('notes/todo.txt', 'text from an OCR or manual summary')
 
-# Add personal organisation notes (stored as `[dd-mm-yy-hh:mm:ss]{Note: ...}`)
+# Add personal organisation notes (stored as `[dd-mm-yy-hh:mm:ss]...`)
 db.append_organization_notes([1], 'Remember to move this to /archive')
 
 # Find similar reports using vector search

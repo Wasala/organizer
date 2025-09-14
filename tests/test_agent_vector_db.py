@@ -61,8 +61,8 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     assert ins1["id"] in notes_res["updated_ids"]
     notes_lines = db.get_organization_notes("file1.txt")["organization_notes"].splitlines()
     assert len(notes_lines) == 2
-    assert notes_lines[0].endswith("{Note: note1}")
-    assert notes_lines[1].endswith("{Note: note2}")
+    assert notes_lines[0].endswith("note1")
+    assert notes_lines[1].endswith("note2")
 
     db.set_planned_destination("file1.txt", "dest/a")
     db.set_final_destination("file1.txt", "final/a")
@@ -120,7 +120,7 @@ def test_prepend_and_remove_sentinel(tmp_path, monkeypatch):
     db.append_organization_notes([inserted["id"]], "note1")
     db.prepend_organization_note_sentinel("note.txt", PROCESSING_SENTINELS[0])
     notes = db.get_organization_notes("note.txt")["organization_notes"].splitlines()
-    assert notes[1] == PROCESSING_SENTINELS[0]
+    assert notes[0] == PROCESSING_SENTINELS[0]
     db.remove_organization_note_sentinel("note.txt", PROCESSING_SENTINELS[0])
     remaining = db.get_organization_notes("note.txt")["organization_notes"].splitlines()
     assert PROCESSING_SENTINELS[0] not in remaining

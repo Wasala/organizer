@@ -434,7 +434,7 @@ class AgentVectorDB:
         now = _iso_now()
         updated: list[int] = []
         timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
-        note_line = f"[{timestamp}]{{Note: {notes_to_append.strip()}}}\n"
+        note_line = f"[{timestamp}]{notes_to_append.strip()}\n"
         for file_id in ids:
             row = cur.execute(
                 "SELECT organization_notes, path_rel FROM files WHERE id=?",
@@ -491,8 +491,12 @@ class AgentVectorDB:
         if not row:
             raise KeyError(f"path not found: {path_rel}")
         existing = row["organization_notes"] or ""
-        timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
-        sentinel_block = f"[{timestamp}]\n{message.strip()}\n"
+        msg = message.strip()
+        if msg in PROCESSING_SENTINELS:
+            sentinel_block = f"{msg}\n"
+        else:
+            timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
+            sentinel_block = f"[{timestamp}]{msg}\n"
         new_notes = sentinel_block + existing
         cur.execute(
             "UPDATE files SET organization_notes=?, updated_at=? WHERE id=?",
@@ -539,7 +543,10 @@ class AgentVectorDB:
         existing = row["organization_notes"] or ""
         parts = existing.splitlines(keepends=True)
         new_notes = existing
-        if len(parts) >= 2 and parts[1].strip() == message.strip():
+        msg = message.strip()
+        if parts and parts[0].strip() == msg:
+            new_notes = "".join(parts[1:])
+        elif len(parts) >= 2 and parts[1].strip() == msg:
             new_notes = "".join(parts[2:])
         cur.execute(
             "UPDATE files SET organization_notes=?, updated_at=? WHERE id=?",
