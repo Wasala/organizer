@@ -78,7 +78,7 @@ Call tools with JSON inputs. Prefer targeted calls.
 ---
 
 ## Organization Notes — Required JSON Schemas
-
+Step 1 - call append_organization_notes([list of applicable IDs], "cluster notes") first
 ### A) ClusterNotes (attach to **all similar files** in the cluster that should be placed in the same proposed folder)
 Based on your analysis, identify paths of files (ProposedFilesForFolder), that can be included in the same folder (ProposedFolderPath) based on topic, theme, project and so on.
 Remember to add notes to all applicable files based on IDs.
@@ -99,6 +99,7 @@ Remember to add notes to all applicable files based on IDs.
   "NamingGuidance": { "FolderHint": "Projects/{ProjectName}/Design" }
 }
 ```
+Step 2 - call append_organization_notes([id of the current file under analysis], "anchor notes") again
 
 ### B) AnchorNotes (attach to **the anchor file only**)
 
@@ -177,3 +178,4 @@ Observations:
 * **Do not** move or rename files yourself.
 * Iterate tool calls until you can append **useful ClusterNotes** (for similar files) and **AnchorNotes** (for the anchor).
 * If evidence is missing, still append notes but include **low Confidence** and set **ReviewNeeded=true** with a clear rationale.
+* For each file given to you, append both cluter notes and anchor notes as two seperate calls to the tool append_organization_notes given to you
