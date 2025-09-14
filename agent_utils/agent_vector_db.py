@@ -434,7 +434,7 @@ class AgentVectorDB:
         now = _iso_now()
         updated: list[int] = []
         timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
-        note_line = f"[{timestamp}]\n{notes_to_append.strip()}\n"
+        note_line = f"[{timestamp}]{{Note: {notes_to_append.strip()}}}\n"
         for file_id in ids:
             row = cur.execute(
                 "SELECT organization_notes, path_rel FROM files WHERE id=?",
@@ -460,6 +460,101 @@ class AgentVectorDB:
         self.conn.commit()
         logger.info("Appended organization notes to ids=%s", updated)
         return {"ok": True, "updated_ids": updated}
+
+    @_safe_json
+    def prepend_organization_note_sentinel(
+        self, path_from_base: str, message: str
+    ) -> dict:
+        """Prepend a processing sentinel to ``organization_notes``.
+
+        Parameters
+        ----------
+        path_from_base:
+            File path relative to the base directory.
+        message:
+            Sentinel message to insert as the first line.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing ``id`` and ``path_rel``.
+        """
+
+        if not message or not message.strip():
+            raise ValueError("message is empty.")
+        path_rel = _norm_rel(path_from_base)
+        cur = self.conn.cursor()
+        row = cur.execute(
+            "SELECT id, organization_notes FROM files WHERE path_rel=?",
+            (path_rel,),
+        ).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {path_rel}")
+        existing = row["organization_notes"] or ""
+        timestamp = datetime.now(timezone.utc).strftime("%d-%m-%y-%H:%M:%S")
+        sentinel_block = f"[{timestamp}]\n{message.strip()}\n"
+        new_notes = sentinel_block + existing
+        cur.execute(
+            "UPDATE files SET organization_notes=?, updated_at=? WHERE id=?",
+            (new_notes, _iso_now(), int(row["id"])),
+        )
+        emb = self._embed_doc(new_notes) if new_notes else None
+        cur.execute("DELETE FROM vec_org_notes WHERE file_id=?", (int(row["id"]),))
+        if emb is not None:
+            cur.execute(
+                "INSERT INTO vec_org_notes(file_id, embedding, path_rel) VALUES(?, ?, ?)",
+                (int(row["id"]), emb, path_rel),
+            )
+        self.conn.commit()
+        logger.info("Prepended sentinel to organization notes for %s", path_rel)
+        return {"ok": True, "id": int(row["id"]), "path_rel": path_rel}
+
+    @_safe_json
+    def remove_organization_note_sentinel(
+        self, path_from_base: str, message: str
+    ) -> dict:
+        """Remove a processing sentinel from ``organization_notes``.
+
+        Parameters
+        ----------
+        path_from_base:
+            File path relative to the base directory.
+        message:
+            Sentinel message previously inserted.
+
+        Returns
+        -------
+        dict
+            JSON-friendly result containing ``id`` and ``path_rel``.
+        """
+
+        path_rel = _norm_rel(path_from_base)
+        cur = self.conn.cursor()
+        row = cur.execute(
+            "SELECT id, organization_notes FROM files WHERE path_rel=?",
+            (path_rel,),
+        ).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {path_rel}")
+        existing = row["organization_notes"] or ""
+        parts = existing.splitlines(keepends=True)
+        new_notes = existing
+        if len(parts) >= 2 and parts[1].strip() == message.strip():
+            new_notes = "".join(parts[2:])
+        cur.execute(
+            "UPDATE files SET organization_notes=?, updated_at=? WHERE id=?",
+            (new_notes, _iso_now(), int(row["id"])),
+        )
+        cur.execute("DELETE FROM vec_org_notes WHERE file_id=?", (int(row["id"]),))
+        if new_notes:
+            emb = self._embed_doc(new_notes)
+            cur.execute(
+                "INSERT INTO vec_org_notes(file_id, embedding, path_rel) VALUES(?, ?, ?)",
+                (int(row["id"]), emb, path_rel),
+            )
+        self.conn.commit()
+        logger.info("Removed sentinel from organization notes for %s", path_rel)
+        return {"ok": True, "id": int(row["id"]), "path_rel": path_rel}
 
     @_safe_json
     def set_planned_destination(self, path_from_base: str, planned_dest: str) -> dict:
