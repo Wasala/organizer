@@ -53,23 +53,10 @@ async def _log_event_stream(
     async for event in stream:
         logger.info("decider agent event: %s", event)
 
-
-@agent.tool_plain
-def append_organization_cluser_notes(ids: list[int], notes: str) -> dict:
-    """Append organization notes to the given file ``ids``."""
-    return tools.append_organization_cluser_notes(ids, notes)
-
-
 @agent.tool_plain
 def get_file_report(path: str) -> dict:
     """Retrieve the stored file report for ``path``."""
     return tools.get_file_report(path)
-
-
-@agent.tool_plain
-def set_planned_destination(path: str, planned_dest: str) -> dict:
-    """Set the planned destination for ``path``."""
-    return tools.set_planned_destination(path, planned_dest)
 
 
 @agent.tool_plain
