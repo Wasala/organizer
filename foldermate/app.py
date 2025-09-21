@@ -3,10 +3,13 @@
 # pylint: disable=missing-function-docstring
 
 from __future__ import annotations
-from typing import List, Optional, Literal, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
-import threading, time
+import logging
 import os
+import re
+import threading
+import time
 
 from fastapi import FastAPI, HTTPException  # pylint: disable=import-error
 from fastapi.middleware.cors import CORSMiddleware  # pylint: disable=import-error
@@ -39,6 +42,8 @@ def ui_root():
 
 db = AgentVectorDB("organizer.config.json")
 db.clear_processing_file_reports()
+
+logger = logging.getLogger(__name__)
 
 # ---------- Single-action state ----------
 class RunState:
@@ -200,6 +205,52 @@ def _row_to_file_row(r) -> FileRow:
     )
 
 
+def _clean_decider_output(raw_output: str) -> str:
+    """Validate and normalise the decider agent output.
+
+    Parameters
+    ----------
+    raw_output:
+        Raw response string returned by the decider agent.
+
+    Returns
+    -------
+    str
+        Sanitised planned destination path or a bracketed explanation.
+
+    Raises
+    ------
+    ValueError
+        If the output is empty or does not resemble a valid response.
+    """
+
+    text = (raw_output or "").strip()
+    if not text:
+        raise ValueError("Decider agent returned an empty response.")
+
+    first_line = text.splitlines()[0].strip()
+    text = first_line
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1].strip()
+
+    if re.fullmatch(r"\[[^\r\n]*\]", text):
+        return text
+
+    if len(text) > 500:
+        raise ValueError("Decider agent response is unexpectedly long.")
+
+    normalised = text.replace("\\", "/")
+    segments = [segment.strip() for segment in normalised.split("/") if segment.strip()]
+    if not segments:
+        raise ValueError(f"Unexpected decider output: {text}")
+
+    filename = segments[-1]
+    if len(segments) > 1 or "." in filename:
+        return text
+
+    raise ValueError(f"Unexpected decider output: {text}")
+
+
 def _analyze_pending_files(base_dir: str) -> None:
     """Generate file reports for all files missing analysis.
 
@@ -252,6 +303,50 @@ def _plan_pending_files(_base_dir: str) -> None:
         db.remove_organization_note_sentinel(path_rel, PROCESSING_SENTINELS[0])
         db.mark_organization_plan_processed(path_rel)
 
+
+def _decide_pending_files() -> None:
+    """Run the decider agent for files missing planned destinations."""
+
+    from file_organization_decider_agent.agent import (  # pylint: disable=import-outside-toplevel
+        ask_file_organization_decider_agent,
+    )
+
+    while not runstate.cancel_event.is_set():
+        next_path = db.get_next_path_missing_planned_destination()
+        if not isinstance(next_path, dict) or not next_path.get("ok", True):
+            logger.error("Failed to fetch next undecided path: %s", next_path)
+            break
+        path_rel = next_path.get("path_rel")
+        if not path_rel:
+            break
+
+        runstate.status_text = f"Deciding {path_rel}"
+        sentinel_result = db.set_planned_destination(path_rel, PROCESSING_SENTINELS[0])
+        if not sentinel_result.get("ok", True):
+            logger.error(
+                "Unable to mark %s as processing: %s",
+                path_rel,
+                sentinel_result.get("error"),
+            )
+            break
+
+        try:
+            agent_output = ask_file_organization_decider_agent(path_rel)
+            planned_dest = _clean_decider_output(agent_output)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("Decider agent failed for %s", path_rel)
+            planned_dest = f"[decider error: {exc}]"
+
+        final_result = db.set_planned_destination(path_rel, planned_dest)
+        if not final_result.get("ok", True):
+            logger.error(
+                "Unable to persist planned destination for %s: %s",
+                path_rel,
+                final_result.get("error"),
+            )
+            break
+
+
 # ---------- Config ----------
 @app.get("/api/config", response_model=ConfigOut)
 def get_config():
@@ -275,7 +370,7 @@ def pick_folder():
         # bring dialog to front on Windows
         try:
             root.attributes("-topmost", True)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             pass
         path = filedialog.askdirectory(title="Select source folder") or ""
         root.destroy()
@@ -316,7 +411,11 @@ def status():
         "ok": True,
         "current_action": runstate.current_action,
         "status_text": runstate.status_text,
-        "started_at": datetime.utcfromtimestamp(runstate.started_at).isoformat() if runstate.started_at else None,
+        "started_at": (
+            datetime.utcfromtimestamp(runstate.started_at).isoformat()
+            if runstate.started_at
+            else None
+        ),
     }
 
 @app.post("/api/actions/{action}", response_model=StatusOut)
@@ -331,7 +430,11 @@ def start_action(
 
     if action == "scan":
         base_dir = payload.base_dir if payload and payload.base_dir else db.config.get("base_dir")
-        recursive = payload.recursive if payload and payload.recursive is not None else db.config.get("recursive", True)
+        recursive = (
+            payload.recursive
+            if payload and payload.recursive is not None
+            else db.config.get("recursive", True)
+        )
         if not base_dir:
             runstate.stop()
             raise HTTPException(status_code=400, detail="base_dir not set")
@@ -394,6 +497,19 @@ def start_action(
         threading.Thread(target=plan_worker, daemon=True).start()
         return status()
 
+    if action == "decide":
+        def decide_worker() -> None:
+            """Run final decisions in a background thread."""
+
+            try:
+                _decide_pending_files()
+            finally:
+                runstate.stop()
+                runstate.status_text = "Idle"
+
+        threading.Thread(target=decide_worker, daemon=True).start()
+        return status()
+
     return status()
 
 @app.post("/api/stop", response_model=StatusOut)
@@ -418,7 +534,12 @@ def list_files(
     params: Dict[str, Any] = {}
     if q:
         where.append(
-            "(LOWER(path_rel) LIKE :q OR LOWER(file_report) LIKE :q OR LOWER(organization_notes) LIKE :q OR LOWER(IFNULL(planned_dest,'')) LIKE :q OR LOWER(IFNULL(final_dest,'')) LIKE :q)"
+            (
+                "(LOWER(path_rel) LIKE :q OR LOWER(file_report) LIKE :q OR "
+                "LOWER(organization_notes) LIKE :q OR "
+                "LOWER(IFNULL(planned_dest,'')) LIKE :q OR "
+                "LOWER(IFNULL(final_dest,'')) LIKE :q)"
+            )
         )
         params["q"] = f"%{q.lower()}%"
 
