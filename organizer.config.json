@@ -27,6 +27,11 @@
     "encoding_name": "cl100k_base",
     "conversion_timeout": 45
   },
+  "file_organization_decider_agent": {
+    "model": "gpt-5-nano",
+    "max_return_chars": 200000,
+    "token_limit": 100000
+  },
   "file_organization_planner_agent": {
     "model": "gpt-5-nano",
     "max_return_chars": 200000,
