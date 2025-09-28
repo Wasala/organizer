@@ -322,3 +322,32 @@ def test_move_pending_files_prevents_target_escape(app_harness: AppHarness):
     assert final_dest == "[error: planned destination escapes target folder]"
     assert source.exists()
 
+
+def test_move_action_updates_organized_path_fields(app_harness: AppHarness):
+    """The API should expose the final organised path after files are moved."""
+
+    module = app_harness.module
+    client = app_harness.client
+    db = app_harness.db
+    base_dir = app_harness.base_dir
+    target_dir = app_harness.target_dir
+
+    source = base_dir / "f.txt"
+    source.write_text("foxtrot", encoding="utf-8")
+
+    created = client.post("/api/files", json={"path_rel": "f.txt"}).json()
+    file_id = created["id"]
+
+    db.set_planned_destination("f.txt", "organized/f.txt")
+
+    module._move_pending_files(str(base_dir), str(target_dir), dont_delete=True)
+
+    destination = target_dir / "organized/f.txt"
+
+    listing = client.get("/api/files", params={"page_size": 10}).json()
+    row = next(r for r in listing["rows"] if r["id"] == file_id)
+    assert row["organized_path"] == str(destination)
+
+    detail = client.get(f"/api/files/{file_id}").json()
+    assert detail["organized_path"] == str(destination)
+

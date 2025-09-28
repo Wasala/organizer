@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException  # pylint: disable=import-error
 from fastapi.middleware.cors import CORSMiddleware  # pylint: disable=import-error
 from fastapi.responses import FileResponse  # pylint: disable=import-error
 from fastapi.staticfiles import StaticFiles  # pylint: disable=import-error
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from agent_utils.agent_vector_db import AgentVectorDB, PROCESSING_SENTINELS
 
@@ -121,7 +121,7 @@ class FileRow(BaseModel):
     file_report_preview: Optional[str] = None
     organization_notes_preview: Optional[str] = None
     planned_dest: Optional[str] = None
-    organized_path: Optional[str] = Field(None, alias="final_dest")
+    organized_path: Optional[str] = None
     created_at: str
     updated_at: str
     has_file_report: bool
@@ -137,7 +137,7 @@ class FileRowFull(BaseModel):
     file_report: Optional[str] = None
     organization_notes: Optional[str] = None
     planned_dest: Optional[str] = None
-    organized_path: Optional[str] = Field(None, alias="final_dest")
+    organized_path: Optional[str] = None
     created_at: str
     updated_at: str
 
