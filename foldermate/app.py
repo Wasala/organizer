@@ -8,6 +8,7 @@ from datetime import datetime
 import logging
 import os
 import re
+import shutil
 import threading
 import time
 
@@ -251,6 +252,37 @@ def _clean_decider_output(raw_output: str) -> str:
     raise ValueError(f"Unexpected decider output: {text}")
 
 
+def _looks_like_path(value: str) -> bool:
+    """Return ``True`` when ``value`` appears to describe a filesystem path.
+
+    Parameters
+    ----------
+    value:
+        Candidate string retrieved from the planner or decider output.
+
+    Returns
+    -------
+    bool
+        ``True`` if the value resembles a valid path (either contains a path
+        separator or appears to include a filename extension) and is not a
+        bracketed error message.
+    """
+
+    if not value:
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    if text.startswith("[") and text.endswith("]"):
+        return False
+    if text in {".", ".."}:
+        return False
+    if re.search(r"[\\/]+", text):
+        return True
+    filename = os.path.basename(text)
+    return "." in filename
+
+
 def _analyze_pending_files(base_dir: str) -> None:
     """Generate file reports for all files missing analysis.
 
@@ -345,6 +377,86 @@ def _decide_pending_files() -> None:
                 final_result.get("error"),
             )
             break
+
+
+def _move_pending_files(base_dir: str, target_dir: str, dont_delete: bool) -> None:
+    """Copy or move files to their planned destinations.
+
+    Files with a planned destination but no recorded final destination are
+    iterated. For each entry, a destination path relative to ``target_dir`` is
+    constructed (unless the planned destination is already absolute). Folder
+    hierarchies are created as required and the file is copied. When
+    ``dont_delete`` is ``False`` the original file is removed after verifying
+    the copy exists. Any errors are written back to the ``final_dest`` column so
+    they surface in the UI.
+    """
+
+    base_dir_abs = os.path.abspath(base_dir)
+    target_dir_abs = os.path.abspath(target_dir)
+
+    while not runstate.cancel_event.is_set():
+        next_path = db.get_next_path_missing_final_destination()
+        if not isinstance(next_path, dict) or not next_path.get("ok", True):
+            logger.error("Failed to fetch next path to move: %s", next_path)
+            break
+        path_rel = next_path.get("path_rel")
+        if not path_rel:
+            break
+
+        runstate.status_text = f"Moving {path_rel}"
+        row = db.conn.execute(
+            "SELECT planned_dest FROM files WHERE path_rel=?",
+            (path_rel,),
+        ).fetchone()
+        planned_dest = (row["planned_dest"] or "").strip() if row else ""
+
+        if not planned_dest:
+            db.set_final_destination(path_rel, "[error: planned destination missing]")
+            continue
+        if not _looks_like_path(planned_dest):
+            db.set_final_destination(path_rel, "[error: planned destination invalid]")
+            continue
+
+        source_path = os.path.join(base_dir_abs, path_rel)
+        if not os.path.exists(source_path):
+            db.set_final_destination(path_rel, "[error: source file not found]")
+            continue
+
+        if os.path.isabs(planned_dest):
+            dest_full = os.path.abspath(planned_dest)
+        else:
+            dest_full = os.path.abspath(
+                os.path.join(target_dir_abs, planned_dest.lstrip("/\\"))
+            )
+
+        try:
+            common_root = os.path.commonpath([target_dir_abs, dest_full])
+        except ValueError:
+            common_root = ""
+        if common_root != target_dir_abs:
+            db.set_final_destination(
+                path_rel,
+                "[error: planned destination escapes target folder]",
+            )
+            continue
+
+        dest_dirname = os.path.dirname(dest_full)
+        if not dest_dirname:
+            db.set_final_destination(path_rel, "[error: destination folder missing]")
+            continue
+
+        try:
+            os.makedirs(dest_dirname, exist_ok=True)
+            shutil.copy2(source_path, dest_full)
+            if not dont_delete:
+                if not os.path.exists(dest_full):
+                    raise FileNotFoundError("destination copy missing after copy")
+                os.remove(source_path)
+            db.set_final_destination(path_rel, dest_full)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("Failed to move file %s", path_rel)
+            message = str(exc).strip() or "unexpected error"
+            db.set_final_destination(path_rel, f"[error: {message}]")
 
 
 # ---------- Config ----------
@@ -508,6 +620,40 @@ def start_action(
                 runstate.status_text = "Idle"
 
         threading.Thread(target=decide_worker, daemon=True).start()
+        return status()
+
+    if action == "move":
+        try:
+            base_info = db.get_base_dir()
+        except Exception as exc:  # pragma: no cover - defensive
+            runstate.stop()
+            raise HTTPException(status_code=400, detail="base_dir not set") from exc
+
+        target_dir = db.config.get("target_dir")
+        if not target_dir:
+            runstate.stop()
+            raise HTTPException(status_code=400, detail="target_dir not set")
+
+        dont_delete_raw = db.config.get("dont_delete", True)
+        if isinstance(dont_delete_raw, bool):
+            dont_delete = dont_delete_raw
+        elif isinstance(dont_delete_raw, str):
+            dont_delete = dont_delete_raw.strip().lower() not in {"false", "0", "no"}
+        else:
+            dont_delete = bool(dont_delete_raw)
+
+        def move_worker() -> None:
+            try:
+                _move_pending_files(
+                    base_info["base_dir"],
+                    target_dir,
+                    dont_delete,
+                )
+            finally:
+                runstate.stop()
+                runstate.status_text = "Idle"
+
+        threading.Thread(target=move_worker, daemon=True).start()
         return status()
 
     return status()
