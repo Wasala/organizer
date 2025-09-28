@@ -147,10 +147,11 @@ class AgentVectorDB:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(DEFAULT_CONFIG, f, indent=2)
             logger.info("Created default config at %s", path)
-            return json.loads(json.dumps(DEFAULT_CONFIG))
-        with open(path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-        logger.info("Loaded config from %s", path)
+            cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+        else:
+            with open(path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            logger.info("Loaded config from %s", path)
 
         def deep_merge(default: dict, user: dict) -> dict:
             out = dict(default)
@@ -161,7 +162,11 @@ class AgentVectorDB:
                     out[k] = v
             return out
 
-        return deep_merge(DEFAULT_CONFIG, cfg)
+        merged = deep_merge(DEFAULT_CONFIG, cfg)
+        db_path = merged.get("db_path", DEFAULT_CONFIG["db_path"])
+        if db_path and not os.path.isabs(db_path):
+            merged["db_path"] = os.path.abspath(os.path.join(os.path.dirname(path), db_path))
+        return merged
 
     def _connect_and_load_vec(self) -> sqlite3.Connection:
         # Allow use across FastAPI worker threads and avoid “created in a different thread”
@@ -173,7 +178,11 @@ class AgentVectorDB:
 
         s = self.config.get("sqlite", {})
         if s.get("wal", True):
-            db.execute("PRAGMA journal_mode=WAL")
+            try:
+                db.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError as exc:  # pragma: no cover - depends on sqlite build
+                logger.warning("WAL mode unavailable (%s); falling back to DELETE", exc)
+                db.execute("PRAGMA journal_mode=DELETE")
         db.execute(f"PRAGMA synchronous={s.get('synchronous', 'NORMAL')}")
         if s.get("temp_store_memory", True):
             db.execute("PRAGMA temp_store=MEMORY")
