@@ -208,6 +208,7 @@ class AgentVectorDB:
               planned_dest TEXT,
               final_dest TEXT,
               log TEXT,
+              selected INTEGER NOT NULL DEFAULT 1,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL
             );
@@ -221,6 +222,10 @@ class AgentVectorDB:
         if "planner_processed" not in cols:
             c.execute(
                 "ALTER TABLE files ADD COLUMN planner_processed INTEGER NOT NULL DEFAULT 0"
+            )
+        if "selected" not in cols:
+            c.execute(
+                "ALTER TABLE files ADD COLUMN selected INTEGER NOT NULL DEFAULT 1"
             )
         exists_vec_fr = c.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_file_report'"
@@ -317,7 +322,7 @@ class AgentVectorDB:
         path_rel = _norm_rel(path_from_base)
         now = _iso_now()
         cur = self.conn.execute(
-            "INSERT OR IGNORE INTO files(path_rel, created_at, updated_at) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO files(path_rel, selected, created_at, updated_at) VALUES (?, 1, ?, ?)",
             (path_rel, now, now),
         )
         self.conn.commit()
@@ -618,7 +623,48 @@ class AgentVectorDB:
         logger.info("Set final destination for %s -> %s", path_rel, final_dest)
         return {"ok": True, "path_rel": path_rel, "final_dest": final_dest}
 
-    def _update_one(self, col: str, path_rel: str, value: str) -> None:
+    @_safe_json
+    def set_selected(self, path_from_base: str, selected: bool) -> dict:
+        path_rel = _norm_rel(path_from_base)
+        value = 1 if selected else 0
+        row = self.conn.execute("SELECT id FROM files WHERE path_rel=?", (path_rel,)).fetchone()
+        if not row:
+            raise KeyError(f"path not found: {path_rel}")
+        self.conn.execute(
+            "UPDATE files SET selected=?, updated_at=? WHERE id=?",
+            (value, _iso_now(), int(row["id"])),
+        )
+        self.conn.commit()
+        logger.info("Set selected=%s for %s", selected, path_rel)
+        return {"ok": True, "path_rel": path_rel, "selected": bool(value)}
+
+    @_safe_json
+    def set_selected_by_ids(self, ids: list[int], selected: bool) -> dict:
+        if not ids:
+            return {"ok": True, "updated": 0, "selected": selected}
+        value = 1 if selected else 0
+        placeholders = ",".join("?" for _ in ids)
+        now = _iso_now()
+        cur = self.conn.execute(
+            f"UPDATE files SET selected=?, updated_at=? WHERE id IN ({placeholders})",
+            (value, now, *ids),
+        )
+        self.conn.commit()
+        logger.info("Updated selected=%s for %s rows", selected, cur.rowcount)
+        return {"ok": True, "updated": int(cur.rowcount), "selected": selected}
+
+    @_safe_json
+    def set_selected_all(self, selected: bool) -> dict:
+        value = 1 if selected else 0
+        cur = self.conn.execute(
+            "UPDATE files SET selected=?, updated_at=?",
+            (value, _iso_now()),
+        )
+        self.conn.commit()
+        logger.info("Updated selected=%s for all rows", selected)
+        return {"ok": True, "updated": int(cur.rowcount), "selected": selected}
+
+    def _update_one(self, col: str, path_rel: str, value: T.Any) -> None:
         row = self.conn.execute("SELECT id FROM files WHERE path_rel=?", (path_rel,)).fetchone()
         if not row:
             raise KeyError(f"path not found: {path_rel}")
@@ -633,8 +679,8 @@ class AgentVectorDB:
         row = self.conn.execute(
             """
             SELECT path_rel FROM files
-            WHERE IFNULL(TRIM(file_report),'')=''
-               OR file_report IN (?, ?)
+            WHERE selected=1
+              AND (IFNULL(TRIM(file_report),'')='' OR file_report IN (?, ?))
             ORDER BY id ASC LIMIT 1
             """,
             PROCESSING_SENTINELS,
@@ -668,7 +714,8 @@ class AgentVectorDB:
         row = self.conn.execute(
             """
             SELECT path_rel FROM files
-            WHERE IFNULL(TRIM(file_report),'')<>''
+            WHERE selected=1
+              AND IFNULL(TRIM(file_report),'')<>''
               AND planner_processed=0
             ORDER BY id ASC LIMIT 1
             """
@@ -680,7 +727,8 @@ class AgentVectorDB:
         row = self.conn.execute(
             """
             SELECT path_rel FROM files
-            WHERE IFNULL(TRIM(file_report),'')<>''
+            WHERE selected=1
+              AND IFNULL(TRIM(file_report),'')<>''
               AND planner_processed=1
               AND IFNULL(TRIM(planned_dest),'')=''
             ORDER BY id ASC LIMIT 1
@@ -693,7 +741,8 @@ class AgentVectorDB:
         row = self.conn.execute(
             """
             SELECT path_rel FROM files
-            WHERE IFNULL(TRIM(planned_dest),'')<>''
+            WHERE selected=1
+              AND IFNULL(TRIM(planned_dest),'')<>''
               AND IFNULL(TRIM(final_dest),'')=''
             ORDER BY id ASC LIMIT 1
             """

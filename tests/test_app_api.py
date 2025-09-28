@@ -115,6 +115,7 @@ def test_insert_and_list_files(app_harness: AppHarness):
     listing = client.get("/api/files", params={"page_size": 10}).json()
     assert listing["total"] == 1
     assert listing["rows"][0]["path_rel"] == "docs/report.txt"
+    assert listing["rows"][0]["selected"] is True
 
 
 def test_get_file_and_set_planned_destination(app_harness: AppHarness):
@@ -133,6 +134,47 @@ def test_get_file_and_set_planned_destination(app_harness: AppHarness):
 
     detail = client.get(f"/api/files/{file_id}").json()
     assert detail["planned_dest"] == "Images/Trips/image.jpg"
+    assert detail["selected"] is True
+
+
+def test_selection_endpoints_and_persistence(app_harness: AppHarness):
+    """Checkbox selections should persist and support bulk operations."""
+
+    client = app_harness.client
+
+    first = client.post("/api/files", json={"path_rel": "first.txt"}).json()
+    second = client.post("/api/files", json={"path_rel": "second.txt"}).json()
+
+    resp = client.put(
+        f"/api/files/{first['id']}/selected",
+        json={"selected": False},
+    ).json()
+    assert resp["selected"] is False
+
+    listing = client.get("/api/files", params={"order_by": "path_rel", "order_dir": "asc"}).json()
+    rows = {row["path_rel"]: row for row in listing["rows"]}
+    assert rows["first.txt"]["selected"] is False
+    assert rows["second.txt"]["selected"] is True
+
+    bulk = client.post(
+        "/api/files/selection",
+        json={"ids": [second["id"]], "selected": False},
+    ).json()
+    assert bulk["updated"] == 1
+
+    listing = client.get("/api/files", params={"order_by": "path_rel", "order_dir": "asc"}).json()
+    rows = {row["path_rel"]: row for row in listing["rows"]}
+    assert rows["first.txt"]["selected"] is False
+    assert rows["second.txt"]["selected"] is False
+
+    all_resp = client.post(
+        "/api/files/selection/all",
+        json={"selected": True},
+    ).json()
+    assert all_resp["updated"] == listing["total"]
+
+    listing = client.get("/api/files", params={"order_by": "path_rel", "order_dir": "asc"}).json()
+    assert all(row["selected"] for row in listing["rows"])
 
 
 def test_file_report_endpoints(app_harness: AppHarness):

@@ -44,9 +44,11 @@ def test_scan_populates_db(tmp_path, monkeypatch):
     data = client.get("/api/files").json()
     paths = [r["path_rel"] for r in data["rows"]]
     assert "a.txt" in paths and "sub/b.txt" not in paths
+    assert all(r["selected"] for r in data["rows"])
 
     resp = client.post("/api/actions/scan", json={"base_dir": str(base_dir), "recursive": True})
     assert resp.status_code == 200
     data = client.get("/api/files").json()
     paths = [r["path_rel"] for r in data["rows"]]
     assert "sub/b.txt" in paths
+    assert all(r["selected"] for r in data["rows"])

@@ -209,3 +209,56 @@ def test_planned_destination_folders_for_proposed(tmp_path, monkeypatch):
     )
     assert "/Personal/Health/Laya_OutpatientClaims" in res["folders"]
     assert "/Personal/Health/InsuranceClaims" in res["folders"]
+
+
+def test_selection_filters_work_while_processing(tmp_path, monkeypatch):
+    """Selection flags should control which files are processed next."""
+
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "sel.cfg"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+
+    db.insert("alpha.txt")
+    db.insert("beta.txt")
+
+    assert db.get_next_path_missing_file_report()["path_rel"] == "alpha.txt"
+    db.set_selected("alpha.txt", False)
+    assert db.get_next_path_missing_file_report()["path_rel"] == "beta.txt"
+    db.set_selected("beta.txt", False)
+    assert db.get_next_path_missing_file_report()["path_rel"] is None
+
+    db.set_selected("alpha.txt", True)
+    db.set_selected("beta.txt", True)
+    db.set_file_report("alpha.txt", "report alpha")
+    db.set_file_report("beta.txt", "report beta")
+
+    assert db.get_next_path_pending_organization_plan()["path_rel"] == "alpha.txt"
+    db.set_selected("alpha.txt", False)
+    assert db.get_next_path_pending_organization_plan()["path_rel"] == "beta.txt"
+    db.set_selected("beta.txt", False)
+    assert db.get_next_path_pending_organization_plan()["path_rel"] is None
+
+    db.set_selected("alpha.txt", True)
+    db.set_selected("beta.txt", True)
+    db.mark_organization_plan_processed("alpha.txt")
+    db.mark_organization_plan_processed("beta.txt")
+
+    assert db.get_next_path_missing_planned_destination()["path_rel"] == "alpha.txt"
+    db.set_selected("alpha.txt", False)
+    assert db.get_next_path_missing_planned_destination()["path_rel"] == "beta.txt"
+    db.set_selected("beta.txt", False)
+    assert db.get_next_path_missing_planned_destination()["path_rel"] is None
+
+    db.set_selected("alpha.txt", True)
+    db.set_selected("beta.txt", True)
+    db.set_planned_destination("alpha.txt", "organized/alpha.txt")
+    db.set_planned_destination("beta.txt", "organized/beta.txt")
+
+    assert db.get_next_path_missing_final_destination()["path_rel"] == "alpha.txt"
+    db.set_selected("alpha.txt", False)
+    assert db.get_next_path_missing_final_destination()["path_rel"] == "beta.txt"
+    db.set_selected("beta.txt", False)
+    assert db.get_next_path_missing_final_destination()["path_rel"] is None

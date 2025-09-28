@@ -117,6 +117,7 @@ class FileRow(BaseModel):
 
     id: int
     path_rel: str
+    selected: bool
     file_report_preview: Optional[str] = None
     organization_notes_preview: Optional[str] = None
     planned_dest: Optional[str] = None
@@ -132,6 +133,7 @@ class FileRowFull(BaseModel):
     ok: bool = True
     id: int
     path_rel: str
+    selected: bool
     file_report: Optional[str] = None
     organization_notes: Optional[str] = None
     planned_dest: Optional[str] = None
@@ -157,6 +159,22 @@ class PlannedDestUpdate(BaseModel):
     """Update for planned destination."""
 
     planned_dest: str
+
+class SelectionUpdate(BaseModel):
+    """Toggle selection for a single file."""
+
+    selected: bool
+
+class SelectionBulkUpdate(BaseModel):
+    """Toggle selection for a set of files by identifier."""
+
+    ids: List[int]
+    selected: bool
+
+class SelectionAllUpdate(BaseModel):
+    """Toggle selection state for all files."""
+
+    selected: bool
 
 class NotesAppend(BaseModel):
     """Append notes to multiple files."""
@@ -195,6 +213,7 @@ def _row_to_file_row(r) -> FileRow:
     return FileRow(
         id=int(r["id"]),
         path_rel=r["path_rel"],
+        selected=bool(r["selected"]),
         file_report_preview=_preview(r["file_report"]),
         organization_notes_preview=_preview(r["organization_notes"]),
         planned_dest=r["planned_dest"],
@@ -695,7 +714,7 @@ def list_files(
     total = db.conn.execute(f"SELECT COUNT(*) as c FROM files {where_sql}", params).fetchone()["c"]
     rows = db.conn.execute(
         f"""
-        SELECT id, path_rel, file_report, organization_notes, planned_dest, final_dest,
+        SELECT id, path_rel, selected, file_report, organization_notes, planned_dest, final_dest,
                created_at, updated_at
         FROM files
         {where_sql}
@@ -722,6 +741,7 @@ def get_file(file_id: int):
         "ok": True,
         "id": int(r["id"]),
         "path_rel": r["path_rel"],
+        "selected": bool(r["selected"]),
         "file_report": r["file_report"],
         "organization_notes": r["organization_notes"],
         "planned_dest": r["planned_dest"],
@@ -741,6 +761,24 @@ def set_planned_dest(file_id: int, payload: PlannedDestUpdate):
         raise HTTPException(status_code=404, detail="Not found")
     # use OOP helper (by path)
     return db.set_planned_destination(r["path_rel"], payload.planned_dest)
+
+
+@app.put("/api/files/{file_id}/selected", response_model=Dict[str, Any])
+def set_selected(file_id: int, payload: SelectionUpdate):
+    r = db.conn.execute("SELECT path_rel FROM files WHERE id=?", (file_id,)).fetchone()
+    if not r:
+        raise HTTPException(status_code=404, detail="Not found")
+    return db.set_selected(r["path_rel"], payload.selected)
+
+
+@app.post("/api/files/selection", response_model=Dict[str, Any])
+def set_selection_bulk(payload: SelectionBulkUpdate):
+    return db.set_selected_by_ids(payload.ids, payload.selected)
+
+
+@app.post("/api/files/selection/all", response_model=Dict[str, Any])
+def set_selection_all(payload: SelectionAllUpdate):
+    return db.set_selected_all(payload.selected)
 
 @app.get("/api/files/{file_id}/report", response_model=Dict[str, Any])
 def get_report(file_id: int):
