@@ -46,6 +46,7 @@
     button{border:none; background:var(--primary); color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; box-shadow: 0 6px 18px rgba(37,99,235,.22)}
     button.ghost{background:#fff; color:var(--text); border:1px solid var(--border); box-shadow:none}
     button.danger{background:var(--danger)}
+    button.btn-small{padding:6px 10px; font-size:13px}
     .btn-row{display:flex; gap:8px; flex-wrap:wrap}
 
     /* One-action-at-a-time visual states */
@@ -163,7 +164,9 @@
     <section class="table-wrap" aria-labelledby="planTitle">
       <div class="table-tools">
         <strong id="planTitle">Detailed Plan</strong>
-        <div style="display:flex; gap:10px; align-items:center">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <button id="selectAllBtn" class="ghost btn-small" type="button">Select all</button>
+          <button id="deselectAllBtn" class="ghost btn-small" type="button">Deselect all</button>
           <input id="searchInput" type="search" placeholder="Search path/report/notes…" />
         </div>
       </div>
@@ -171,6 +174,7 @@
         <table aria-describedby="planTitle">
           <thead>
             <tr>
+              <th style="width:50px">Select</th>
               <th>Source file path</th>
               <th>File report</th>
               <th>Organization notes</th>
@@ -234,8 +238,10 @@
         const tr = document.createElement('tr');
         const frPreview = r.file_report_preview || '<span style="color:var(--muted)">—</span>';
         const onPreview = r.organization_notes_preview || '<span style="color:var(--muted)">—</span>';
+        const pathEsc = (r.path_rel || '').replace(/"/g,'&quot;');
         tr.innerHTML = `
-          <td class="mono truncate" title="${r.path_rel}">${r.path_rel}</td>
+          <td style="text-align:center"><input type="checkbox" data-select="${r.id}" ${r.selected ? 'checked' : ''} aria-label="Select ${pathEsc}" /></td>
+          <td class="mono truncate" title="${pathEsc}">${r.path_rel}</td>
           <td>
             <div class="cell-flex">
               <span class="preview truncate" title="${(r.file_report_preview||'').replace(/"/g,'&quot;')}">${frPreview}</span>
@@ -370,6 +376,34 @@
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({planned_dest: dest})
         });
+      }catch(err){console.error(err);}
+    }
+
+    async function updateSelection(id, selected){
+      try{
+        await fetchJSON(`/api/files/${id}/selected`, {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({selected})
+        });
+        const row = state.rows.find(r=>r.id===id);
+        if(row){ row.selected = selected; }
+      }catch(err){
+        console.error(err);
+        await loadRows();
+        toast('Failed to update selection');
+      }
+    }
+
+    async function setSelectionAll(selected){
+      try{
+        await fetchJSON('/api/files/selection/all', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({selected})
+        });
+        await loadRows();
+        toast(selected ? 'All files selected' : 'All files deselected');
       }catch(err){console.error(err);}
     }
 
@@ -510,6 +544,15 @@
 
 
     $('#searchInput').addEventListener('input', loadRows);
+    $('#selectAllBtn').addEventListener('click', ()=>{ setSelectionAll(true); });
+    $('#deselectAllBtn').addEventListener('click', ()=>{ setSelectionAll(false); });
+
+    document.addEventListener('change', (e)=>{
+      if(e.target.matches('input[data-select]')){
+        const id = Number(e.target.getAttribute('data-select'));
+        updateSelection(id, e.target.checked);
+      }
+    });
 
     document.addEventListener('click', (e)=>{
       if(e.target.id === 'closeModal' || e.target.id === 'modal'){ closeModal(); }
