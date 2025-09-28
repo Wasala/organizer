@@ -69,6 +69,9 @@ def _safe_json(fn):
     return wrapper
 
 
+CONFIG_FILE_EXCLUDE_KEYS = {"base_dir", "target_dir", "instructions"}
+
+
 DEFAULT_CONFIG = {
     "db_path": "organizer.sqlite",
     "base_dir": ".",
@@ -109,6 +112,8 @@ class AgentVectorDB:
         self._dim = int(len(probe_vec))
 
         self._ensure_schema()
+        self._refresh_config_from_db()
+        self._write_config_file()
 
     @classmethod
     def from_config(cls, config_path: str) -> "AgentVectorDB":
@@ -136,16 +141,20 @@ class AgentVectorDB:
                 (key, stored),
             )
         c.commit()
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=2)
+        self._write_config_file()
         logger.info("Saved config overrides: %s", list(overrides.keys()))
         return {"ok": True, "config_path": self.config_path, "config": self.config}
 
     @staticmethod
     def _load_or_create_config(path: str) -> dict:
         if not os.path.exists(path):
+            to_store = {
+                key: value
+                for key, value in DEFAULT_CONFIG.items()
+                if key not in CONFIG_FILE_EXCLUDE_KEYS
+            }
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(DEFAULT_CONFIG, f, indent=2)
+                json.dump(to_store, f, indent=2)
             logger.info("Created default config at %s", path)
             cfg = json.loads(json.dumps(DEFAULT_CONFIG))
         else:
@@ -291,10 +300,34 @@ class AgentVectorDB:
         )
         c.commit()
         self.config["base_dir"] = os.path.abspath(base_dir_abs)
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=2)
+        self._write_config_file()
         logger.info("Database reset complete; base_dir=%s", self.config["base_dir"])
         return {"ok": True, "message": "database reset", "base_dir": self.config["base_dir"]}
+
+    def _write_config_file(self) -> None:
+        """Persist the JSON configuration excluding runtime-only keys."""
+
+        persisted = {
+            key: value
+            for key, value in self.config.items()
+            if key not in CONFIG_FILE_EXCLUDE_KEYS
+        }
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(persisted, f, indent=2)
+
+    def _refresh_config_from_db(self) -> None:
+        """Load persisted configuration values from SQLite into memory."""
+
+        rows = self.conn.execute("SELECT key, value FROM config").fetchall()
+        for row in rows:
+            value = row["value"]
+            if isinstance(value, (bytes, bytearray)):
+                value = value.decode("utf-8")
+            try:
+                parsed = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                parsed = value
+            self.config[row["key"]] = parsed
 
     @_safe_json
     def get_base_dir(self) -> dict:
