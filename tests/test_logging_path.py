@@ -14,8 +14,13 @@ def test_planner_agent_logging_respects_config(tmp_path, monkeypatch):
     """Ensure logging honours the path in ``organizer.config.json``."""
     root = _root()
     config_file = root / "organizer.config.json"
-    original = config_file.read_text()
-    data = json.loads(original)
+    template = root / "orgnizer.config.template.json"
+    if config_file.exists():
+        original = config_file.read_text()
+    else:
+        original = None
+        config_file.write_text(template.read_text())
+    data = json.loads(config_file.read_text())
     data["log_dir"] = str(tmp_path)
     config_file.write_text(json.dumps(data, indent=2))
 
@@ -33,5 +38,8 @@ def test_planner_agent_logging_respects_config(tmp_path, monkeypatch):
         assert log_files, "Logging did not write to configured directory"
         assert not list(planner_dir.glob("*.log")), "Log file written to agent directory"
     finally:
-        config_file.write_text(original)
+        if original is None:
+            config_file.unlink(missing_ok=True)
+        else:
+            config_file.write_text(original)
         _clear_agent_utils()

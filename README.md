@@ -48,7 +48,7 @@ organizer/
 ├── file_organization_decider_agent/  # Decider agent plus helper tools
 ├── foldermate/                  # FastAPI app and static SPA for orchestration
 ├── tests/                       # Pytest coverage for key flows
-├── organizer.config.json        # Default runtime configuration
+├── orgnizer.config.template.json  # Sample runtime configuration
 └── pyproject.toml               # Project metadata and Python dependencies
 ```
 
@@ -82,7 +82,8 @@ dependencies so the UI and automation tools are ready to run.
 
 ## Configuration
 
-Runtime behaviour is controlled by `organizer.config.json`. Key sections include:
+Runtime behaviour is controlled by `organizer.config.json` (copy the provided
+`orgnizer.config.template.json` and edit it locally). Key sections include:
 
 * **Top-level settings**
   * `db_path` – SQLite database file used by `AgentVectorDB`.
@@ -103,8 +104,8 @@ API. The FastAPI `/api/config` endpoints support reading and patching settings a
 
 ## Running FolderMate
 
-1. Ensure `organizer.config.json` points at the folders you want to analyse and contains
-   any agent instructions.
+1. Ensure your local `organizer.config.json` points at the folders you want to
+   analyse and contains any agent instructions.
 2. Start the API and static UI:
 
    ```bash

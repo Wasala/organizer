@@ -118,6 +118,44 @@ def test_insert_and_list_files(app_harness: AppHarness):
     assert listing["rows"][0]["selected"] is True
 
 
+def test_insert_rejects_unsupported_extension(app_harness: AppHarness):
+    """Manual inserts should reject files with unsupported extensions."""
+
+    client = app_harness.client
+
+    resp = client.post("/api/files", json={"path_rel": "archive.zip"})
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["detail"] == "unsupported file extension"
+
+
+def test_scan_skips_unsupported_extensions(app_harness: AppHarness):
+    """The scan action must ignore files with disallowed extensions."""
+
+    client = app_harness.client
+    db = app_harness.db
+    base_dir = app_harness.base_dir
+
+    db.save_config(allowed_file_extentions=[".txt"])
+
+    include = base_dir / "keep.txt"
+    include.write_text("include", encoding="utf-8")
+    skip = base_dir / "skip.pdf"
+    skip.write_text("skip", encoding="utf-8")
+
+    resp = client.post(
+        "/api/actions/scan",
+        json={"base_dir": str(base_dir), "recursive": True},
+    )
+    assert resp.status_code == 200
+
+    rows = {
+        row["path_rel"]
+        for row in db.conn.execute("SELECT path_rel FROM files").fetchall()
+    }
+    assert rows == {"keep.txt"}
+
+
 def test_get_file_and_set_planned_destination(app_harness: AppHarness):
     """``/api/files/{id}`` should reflect planned destination updates."""
 

@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 import time
 from datetime import datetime, timezone
 import typing as T
@@ -81,6 +82,33 @@ DEFAULT_CONFIG = {
     "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
     "search": {"top_k": 10, "score_round": 4},
     "log_dir": ".",
+    "allowed_file_extentions": [
+        ".txt",
+        ".md",
+        ".rst",
+        ".json",
+        ".csv",
+        ".yaml",
+        ".yml",
+        ".ini",
+        ".toml",
+        ".docx",
+        ".xlsx",
+        ".pptx",
+        ".pdf",
+        ".html",
+        ".xhtml",
+        ".htm",
+        ".webvtt",
+        ".vtt",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tiff",
+        ".tif",
+        ".bmp",
+        ".webp",
+    ],
     "sqlite": {
         "wal": True,
         "synchronous": "NORMAL",
@@ -93,12 +121,33 @@ DEFAULT_CONFIG = {
 PROCESSING_SENTINELS = ("processing...", "processing..")
 
 
+def _normalise_extensions(values: T.Iterable[str] | None) -> set[str]:
+    """Return a normalised set of file extensions."""
+
+    if not values:
+        return set()
+    normalised: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        candidate = value.strip().lower()
+        if not candidate:
+            continue
+        if not candidate.startswith("."):
+            candidate = f".{candidate}"
+        normalised.add(candidate)
+    return normalised
+
+
 class AgentVectorDB:
     """Semantic vector database for file organization."""
 
     def __init__(self, config_path: str = "organizer.config.json"):
         self.config_path = config_path
         self.config = self._load_or_create_config(config_path)
+        self._allowed_extensions: set[str] = _normalise_extensions(
+            self.config.get("allowed_file_extentions", [])
+        )
         self.conn = self._connect_and_load_vec()
 
         # --- FastEmbed model (ensure a non-empty string) ---
@@ -113,6 +162,7 @@ class AgentVectorDB:
 
         self._ensure_schema()
         self._refresh_config_from_db()
+        self._refresh_allowed_extensions()
         self._write_config_file()
 
     @classmethod
@@ -141,6 +191,7 @@ class AgentVectorDB:
                 (key, stored),
             )
         c.commit()
+        self._refresh_allowed_extensions()
         self._write_config_file()
         logger.info("Saved config overrides: %s", list(overrides.keys()))
         return {"ok": True, "config_path": self.config_path, "config": self.config}
@@ -328,6 +379,28 @@ class AgentVectorDB:
             except (TypeError, json.JSONDecodeError):
                 parsed = value
             self.config[row["key"]] = parsed
+        self._refresh_allowed_extensions()
+
+    def _refresh_allowed_extensions(self) -> None:
+        """Update the cached set of allowed file extensions."""
+
+        values = self.config.get("allowed_file_extentions", [])
+        if isinstance(values, str):
+            values = [part.strip() for part in values.split(",") if part.strip()]
+        self._allowed_extensions = _normalise_extensions(values)
+
+    def get_allowed_extensions(self) -> set[str]:
+        """Return a copy of the configured allowed file extensions."""
+
+        return set(self._allowed_extensions)
+
+    def is_allowed_file(self, path_from_base: str) -> bool:
+        """Return ``True`` when ``path_from_base`` uses an allowed extension."""
+
+        suffix = Path(path_from_base).suffix.lower()
+        if suffix:
+            return suffix in self._allowed_extensions
+        return False
 
     @_safe_json
     def get_base_dir(self) -> dict:
@@ -353,6 +426,10 @@ class AgentVectorDB:
     @_safe_json
     def insert(self, path_from_base: str) -> dict:
         path_rel = _norm_rel(path_from_base)
+        if not self.is_allowed_file(path_rel):
+            raise ValueError(
+                f"unsupported file extension: {Path(path_rel).suffix or 'no extension'}"
+            )
         now = _iso_now()
         cur = self.conn.execute(
             "INSERT OR IGNORE INTO files(path_rel, selected, created_at, updated_at) VALUES (?, 1, ?, ?)",
