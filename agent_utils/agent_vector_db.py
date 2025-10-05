@@ -331,27 +331,28 @@ class AgentVectorDB:
     @_safe_json
     def reset_db(self, base_dir_abs: str) -> dict:
         logger.info("Resetting database with base directory %s", base_dir_abs)
+        base_dir_abs = os.path.abspath(base_dir_abs)
         c = self.conn
         c.executescript(
             """
-            PRAGMA foreign_keys=OFF;
-            DROP TABLE IF EXISTS files;
-            DROP TABLE IF EXISTS config;
-            DROP TABLE IF EXISTS vec_file_report;
-            DROP TABLE IF EXISTS vec_org_notes;
-            PRAGMA foreign_keys=ON;
+            DELETE FROM vec_file_report;
+            DELETE FROM vec_org_notes;
+            DELETE FROM files;
+            DELETE FROM config;
             """
         )
+        try:
+            c.execute("DELETE FROM sqlite_sequence WHERE name='files'")
+        except sqlite3.OperationalError:
+            logger.debug("sqlite_sequence table missing; skipping autoincrement reset")
         self.config.pop("target_dir", None)
         self.config.pop("instructions", None)
-        self._ensure_schema()
         c.execute(
             "INSERT OR REPLACE INTO config(key, value) VALUES('base_dir', ?)",
-            (os.path.abspath(base_dir_abs),),
+            (base_dir_abs,),
         )
         c.commit()
-        self.config["base_dir"] = os.path.abspath(base_dir_abs)
-        self._write_config_file()
+        self.config["base_dir"] = base_dir_abs
         logger.info("Database reset complete; base_dir=%s", self.config["base_dir"])
         return {"ok": True, "message": "database reset", "base_dir": self.config["base_dir"]}
 
