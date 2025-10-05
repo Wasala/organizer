@@ -78,7 +78,9 @@ py -m pip install organizer[foldermate]
 ```
 
 This brings in the FastAPI server, Uvicorn, and supporting packages alongside the agent
-dependencies so the UI and automation tools are ready to run.
+dependencies so the UI and automation tools are ready to run. After installation you can
+start the app with the `foldermate` command (or `py -m foldermate.cli`) and the default
+interface will be available at `http://127.0.0.1:8000/`.
 
 ## Configuration
 
@@ -106,13 +108,16 @@ API. The FastAPI `/api/config` endpoints support reading and patching settings a
 
 1. Ensure your local `organizer.config.json` points at the folders you want to
    analyse and contains any agent instructions.
-2. Start the API and static UI:
+2. Start the API and static UI (override `--host/--port` if needed):
 
    ```bash
-   uvicorn foldermate.app:app --reload
+   foldermate
    ```
 
-3. Open `http://127.0.0.1:8000/` to access the UI. From there you can:
+   On Windows the same entrypoint is also exposed as `py -m foldermate.cli`.
+
+3. By default the server listens on `http://127.0.0.1:8000/`. Open that URL in your
+   browser to access the UI. From there you can:
    * Trigger scans to populate the database.
    * Launch analysis/planning/decision actions.
    * Review file reports, notes, and suggested destinations.
