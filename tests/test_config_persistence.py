@@ -18,8 +18,8 @@ class FakeEmbedder:  # pylint: disable=too-few-public-methods
         return [[0.0]] * len(list(texts))
 
 
-def test_config_persist(tmp_path, monkeypatch):
-    """Ensure config values persist in SQLite and reset clears them."""
+def _prepare_agent_db(monkeypatch):
+    """Monkeypatch expensive dependencies and return the agent module."""
 
     monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
 
@@ -32,6 +32,13 @@ def test_config_persist(tmp_path, monkeypatch):
         return orig_connect(*args, **kwargs)
 
     monkeypatch.setattr(avdb.sqlite3, "connect", _connect)
+    return avdb
+
+
+def test_config_persist(tmp_path, monkeypatch):
+    """Ensure config values persist in SQLite and reset clears them."""
+
+    avdb = _prepare_agent_db(monkeypatch)
 
     import foldermate.app as app_module  # pylint: disable=import-outside-toplevel
     importlib.reload(app_module)
@@ -68,3 +75,21 @@ def test_config_persist(tmp_path, monkeypatch):
     assert row is None
     data = client.get("/api/config").json()
     assert "instructions" not in data["config"]
+
+
+def test_reset_does_not_mutate_config_file(tmp_path, monkeypatch):
+    """Resetting the database should leave the JSON config untouched."""
+
+    avdb = _prepare_agent_db(monkeypatch)
+
+    config_path = tmp_path / "config.json"
+    db = avdb.AgentVectorDB(config_path=str(config_path))
+    before_bytes = config_path.read_bytes()
+    before_mtime = config_path.stat().st_mtime_ns
+
+    base = tmp_path / "base"
+    base.mkdir()
+    db.reset_db(str(base))
+
+    assert config_path.read_bytes() == before_bytes
+    assert config_path.stat().st_mtime_ns == before_mtime
