@@ -574,6 +574,9 @@ def start_action(
         for root, _dirs, files in os.walk(base_dir_abs):
             for fname in files:
                 rel = os.path.relpath(os.path.join(root, fname), base_dir_abs)
+                if not db.is_allowed_file(rel):
+                    logger.debug("Skipping unsupported file extension for %s", rel)
+                    continue
                 db.insert(rel)
             if not recursive:
                 break
@@ -752,6 +755,8 @@ def get_file(file_id: int):
 
 @app.post("/api/files", response_model=Dict[str, Any])
 def insert_file(payload: InsertFilePayload):
+    if not db.is_allowed_file(payload.path_rel):
+        raise HTTPException(status_code=400, detail="unsupported file extension")
     return db.insert(payload.path_rel)
 
 @app.put("/api/files/{file_id}/planned_dest", response_model=Dict[str, Any])
