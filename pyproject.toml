@@ -23,6 +23,9 @@ foldermate = [
     "jinja2",
 ]
 
+[project.scripts]
+foldermate = "foldermate.cli:main"
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
