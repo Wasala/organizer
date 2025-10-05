@@ -65,9 +65,20 @@ pip install -e .
 Optional extras:
 
 * Document conversion for PDFs, Office formats, etc.: `pip install -e .[docling]`
-* FastAPI server dependencies (if not already present in your environment):
-  `pip install fastapi uvicorn pydantic` (the API also uses `sqlite-vec`, `fastembed`,
-  `numpy`, and `pysqlite3-binary`, all pinned in `pyproject.toml`).
+* FolderMate UI and server stack: `pip install -e .[foldermate]` to add FastAPI,
+  Uvicorn, and related web dependencies on top of the core agents.
+
+## Windows quick start
+
+Open **PowerShell** and install the complete FolderMate stack with the built-in Python
+launcher:
+
+```powershell
+py -m pip install organizer[foldermate]
+```
+
+This brings in the FastAPI server, Uvicorn, and supporting packages alongside the agent
+dependencies so the UI and automation tools are ready to run.
 
 ## Configuration
 

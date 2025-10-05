@@ -16,7 +16,22 @@ dependencies = [
 
 [project.optional-dependencies]
 docling = ["docling"]
+foldermate = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "jinja2",
+]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "agent_utils",
+    "file_analysis_agent",
+    "file_organization_planner_agent",
+    "file_organization_decider_agent",
+    "foldermate",
+]
