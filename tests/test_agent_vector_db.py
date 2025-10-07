@@ -19,6 +19,28 @@ class FakeEmbedder:
         return vectors
 
 
+class FakeEmbedderWide:
+    """Embedder producing a larger vector dimensionality."""
+
+    def __init__(self, model_name=None):
+        pass
+
+    def embed(self, texts):
+        vectors = []
+        for t in texts:
+            length = len(t)
+            total = sum(ord(c) for c in t)
+            vectors.append(
+                [
+                    float(length),
+                    float(total % 97),
+                    float((length * total) % 53),
+                    float((length + total) % 71),
+                ]
+            )
+        return vectors
+
+
 class FailingEmbedder:
     """Embedder that fails after the first call to :meth:`embed`."""
 
@@ -97,6 +119,33 @@ def test_agent_vector_db(tmp_path, monkeypatch):
     # config save
     assert db.save_config(search={"top_k": 5})["ok"]
 
+
+def test_rebuild_vector_tables_on_dimension_change(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)
+    config_path = tmp_path / "dim.json"
+    db = AgentVectorDB(config_path=str(config_path))
+    base_dir = tmp_path / "base"
+    base_dir.mkdir()
+    db.reset_db(str(base_dir))
+    db.insert("foo.txt")
+    db.set_file_report("foo.txt", "alpha report")
+    db.append_organization_anchor_notes("foo.txt", "first note")
+
+    db.conn.close()
+
+    monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedderWide)
+    rebuilt = AgentVectorDB(config_path=str(config_path))
+    assert rebuilt.config["embedding_dim"] == 4
+
+    report = rebuilt.get_file_report("foo.txt")
+    assert report["file_report"] == "alpha report"
+
+    notes = rebuilt.get_organization_notes("foo.txt")
+    assert any("first note" in line for line in notes["organization_notes"].splitlines())
+
+    sim = rebuilt.find_similar_file_reports("foo.txt", top_k=1)
+    assert sim["results"]
+    assert sim["results"][0]["path_rel"] == "foo.txt"
 
 def test_clear_processing_file_reports(tmp_path, monkeypatch):
     monkeypatch.setattr("agent_utils.agent_vector_db.TextEmbedding", FakeEmbedder)

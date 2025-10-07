@@ -24,6 +24,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import threading
+from contextlib import nullcontext
+from functools import wraps
 from pathlib import Path
 import time
 from datetime import datetime, timezone
@@ -62,11 +66,18 @@ def _friendly_error(err: Exception) -> dict:
 
 def _safe_json(fn):
     """Decorator: convert exceptions to friendly JSON errors."""
+
+    @wraps(fn)
     def wrapper(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except Exception as e:  # pylint: disable=broad-except
-            return _friendly_error(e)
+        self = args[0] if args else None
+        lock = getattr(self, "_lock", None)
+        ctx = lock if lock is not None else nullcontext()
+        with ctx:
+            try:
+                return fn(*args, **kwargs)
+            except Exception as err:  # pylint: disable=broad-except
+                return _friendly_error(err)
+
     return wrapper
 
 
@@ -148,6 +159,7 @@ class AgentVectorDB:
         self._allowed_extensions: set[str] = _normalise_extensions(
             self.config.get("allowed_file_extentions", [])
         )
+        self._lock = threading.RLock()
         self.conn = self._connect_and_load_vec()
 
         # --- FastEmbed model (ensure a non-empty string) ---
@@ -161,6 +173,7 @@ class AgentVectorDB:
         self._dim = int(len(probe_vec))
 
         self._ensure_schema()
+        self._ensure_vector_table_dimensions()
         self._refresh_config_from_db()
         self._refresh_allowed_extensions()
         self._write_config_file()
@@ -328,6 +341,114 @@ class AgentVectorDB:
                 )
         c.commit()
 
+    def _ensure_vector_table_dimensions(self) -> None:
+        """Ensure vector tables match the current embedding dimensionality."""
+
+        with self._lock:
+            existing_dim = self._get_stored_embedding_dim()
+            vec_file_dim = self._get_vec_table_dim("vec_file_report")
+            vec_notes_dim = self._get_vec_table_dim("vec_org_notes")
+
+            mismatch = any(
+                dim is not None and dim != self._dim
+                for dim in (existing_dim, vec_file_dim, vec_notes_dim)
+            )
+
+            if mismatch:
+                logger.warning(
+                    "Embedding dimension changed (stored=%s, file=%s, notes=%s -> current=%s). "
+                    "Rebuilding vector tables.",
+                    existing_dim,
+                    vec_file_dim,
+                    vec_notes_dim,
+                    self._dim,
+                )
+                self._rebuild_vector_tables()
+
+            self._set_stored_embedding_dim(self._dim)
+
+    def _get_vec_table_dim(self, table_name: str) -> int | None:
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        ).fetchone()
+        if not row or not row["sql"]:
+            return None
+        match = re.search(r"FLOAT\[(\d+)\]", row["sql"])
+        return int(match.group(1)) if match else None
+
+    def _get_stored_embedding_dim(self) -> int | None:
+        row = self.conn.execute(
+            "SELECT value FROM config WHERE key='embedding_dim'",
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            return int(row["value"])
+        except (TypeError, ValueError):
+            return None
+
+    def _set_stored_embedding_dim(self, dim: int) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO config(key, value) VALUES('embedding_dim', ?)",
+            (str(dim),),
+        )
+        self.conn.commit()
+        self.config["embedding_dim"] = dim
+
+    def _rebuild_vector_tables(self) -> None:
+        """Recreate vector tables and repopulate embeddings with the new dimension."""
+
+        c = self.conn
+        c.executescript(
+            """
+            DROP TABLE IF EXISTS vec_file_report;
+            DROP TABLE IF EXISTS vec_org_notes;
+            """
+        )
+        c.executescript(
+            f"""
+            CREATE VIRTUAL TABLE vec_file_report USING vec0(
+              file_id INTEGER PRIMARY KEY,
+              embedding FLOAT[{self._dim}] distance_metric=cosine,
+              +path_rel TEXT
+            );
+            CREATE VIRTUAL TABLE vec_org_notes USING vec0(
+              file_id INTEGER PRIMARY KEY,
+              embedding FLOAT[{self._dim}] distance_metric=cosine,
+              +path_rel TEXT
+            );
+            """
+        )
+
+        rows = c.execute(
+            "SELECT id, path_rel, file_report FROM files WHERE IFNULL(TRIM(file_report),'')<>''",
+        ).fetchall()
+        for row in rows:
+            try:
+                emb = self._embed_doc(row["file_report"])
+            except Exception:  # pylint: disable=broad-except
+                continue
+            c.execute(
+                "INSERT INTO vec_file_report(file_id, embedding, path_rel) VALUES(?, ?, ?)",
+                (int(row["id"]), emb, row["path_rel"]),
+            )
+
+        rows = c.execute(
+            "SELECT id, path_rel, organization_notes FROM files WHERE IFNULL(TRIM(organization_notes),'')<>''",
+        ).fetchall()
+        for row in rows:
+            try:
+                emb = self._embed_doc(row["organization_notes"])
+            except Exception:  # pylint: disable=broad-except
+                continue
+            c.execute(
+                "INSERT INTO vec_org_notes(file_id, embedding, path_rel) VALUES(?, ?, ?)",
+                (int(row["id"]), emb, row["path_rel"]),
+            )
+
+        c.commit()
+
     @_safe_json
     def reset_db(self, base_dir_abs: str) -> dict:
         logger.info("Resetting database with base directory %s", base_dir_abs)
@@ -353,6 +474,7 @@ class AgentVectorDB:
         )
         c.commit()
         self.config["base_dir"] = base_dir_abs
+        self._set_stored_embedding_dim(self._dim)
         logger.info("Database reset complete; base_dir=%s", self.config["base_dir"])
         return {"ok": True, "message": "database reset", "base_dir": self.config["base_dir"]}
 
